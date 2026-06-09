@@ -1,0 +1,15 @@
+{
+  "name": "artemis-business-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Artemis Business OS",
+  "scripts": {
+    "backend:dev": "cd backend && npm run start:dev",
+    "backend:build": "cd backend && npm run build",
+    "backend:test": "cd backend && npm run test",
+    "backend:lint": "cd backend && npm run lint",
+    "backend:prisma:generate": "cd backend && npx prisma generate",
+    "backend:prisma:migrate": "cd backend && npx prisma migrate dev",
+    "backend:prisma:studio": "cd backend && npx prisma studio"
+  }
+}
