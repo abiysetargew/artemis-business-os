@@ -5,7 +5,8 @@ services:
     rootDir: backend
     plan: free
     buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx prisma migrate deploy && npm run start:prod
+    startCommand: npx prisma migrate deploy && node dist/main.js
+
     healthCheckPath: /api/v1/health
     envVars:
       - key: DATABASE_URL
