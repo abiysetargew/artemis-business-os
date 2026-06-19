@@ -4,6 +4,11 @@
   "outputDirectory": "mobile/build/web",
   "installCommand": "echo 'Skipping default install, see vercel-build.sh'",
   "framework": null,
+  "build": {
+    "env": {
+      "API_BASE_URL": "https://artemis-backend-z0e6.onrender.com/api/v1"
+    }
+  },
   "env": {
     "API_BASE_URL": "https://artemis-backend-z0e6.onrender.com/api/v1"
   },
