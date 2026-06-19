@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd mobile && flutter build web --release --dart-define=API_BASE_URL=https://artemis-backend.onrender.com/api/v1",
+  "buildCommand": "cd mobile && flutter build web --release --dart-define=API_BASE_URL=https://artemis-backend-z0e6.onrender.com/api/v1",
   "outputDirectory": "mobile/build/web",
   "installCommand": "cd mobile && flutter pub get",
   "framework": null,
