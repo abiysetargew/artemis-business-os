@@ -1,10 +1,13 @@
+import 'package:artemis_business_os/core/network/api_errors.dart';
+import 'package:artemis_business_os/core/providers.dart';
+import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
+import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:artemis_business_os/core/providers.dart';
-import 'package:artemis_business_os/core/theme/app_theme.dart';
 
 class PaymentsListScreen extends ConsumerStatefulWidget {
   const PaymentsListScreen({super.key});
@@ -291,11 +294,71 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
                   ),
                 ],
               ),
+              if (ref.read(authNotifierProvider).user?.isAdmin ?? false)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (v) {
+                    if (v == 'delete') {
+                      _deletePayment(payment);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    if (status != 'VERIFIED')
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    if (status == 'VERIFIED')
+                      const PopupMenuItem(
+                        enabled: false,
+                        child: Row(
+                          children: [
+                            Icon(Icons.lock, size: 18, color: Colors.grey),
+                            SizedBox(width: 8),
+                            Text(
+                              'Verified (cannot delete)',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _deletePayment(Map<String, dynamic> payment) async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete Payment?',
+      message:
+          'Are you sure you want to delete payment of ETB ${(payment['amount'] as num).toStringAsFixed(2)}? This cannot be undone.',
+      confirmLabel: 'Delete',
+      type: ConfirmDialogType.destructive,
+    );
+    if (!confirmed) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.delete('/payments/${payment['id']}');
+      if (mounted) {
+        showAppSnackBar(context, message: 'Payment deleted', isSuccess: true);
+      }
+      _loadPayments();
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, message: parseApiError(e), isError: true);
+      }
+    }
   }
 }
 

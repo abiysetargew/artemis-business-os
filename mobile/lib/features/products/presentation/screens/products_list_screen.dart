@@ -1,6 +1,8 @@
 import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
+import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,7 +17,6 @@ class ProductsListScreen extends ConsumerStatefulWidget {
 
 class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
   List<dynamic> _products = [];
-  List<dynamic> _categories = [];
   String? _filterCategoryId;
   String? _filterType;
   final _searchController = TextEditingController();
@@ -33,6 +34,30 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _deleteProduct(Map<String, dynamic> product) async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete Product?',
+      message:
+          'Are you sure you want to delete "${product['name']}"? This cannot be undone. If the product has inventory, sales, or production history, the delete will fail.',
+      confirmLabel: 'Delete',
+      type: ConfirmDialogType.destructive,
+    );
+    if (!confirmed) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.delete('/products/${product['id']}');
+      if (mounted) {
+        showAppSnackBar(context, message: 'Product deleted', isSuccess: true);
+      }
+      _load();
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, message: parseApiError(e), isError: true);
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -55,7 +80,6 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
       ]);
       setState(() {
         _products = results[0].data as List<dynamic>;
-        _categories = results[1].data as List<dynamic>;
         _isLoading = false;
       });
     } catch (e) {
@@ -255,6 +279,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
     final type =
         p['categoryType'] as String? ?? p['type'] as String? ?? 'UNKNOWN';
     final color = _typeColor(type);
+    final isAdmin = ref.read(authNotifierProvider).user?.isAdmin ?? false;
     return Card(
       child: ListTile(
         leading: CircleAvatar(
@@ -309,8 +334,11 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
             ),
           ],
         ),
-        trailing: p['isActive'] == false
-            ? Container(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (p['isActive'] == false)
+              Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.grey,
@@ -324,8 +352,42 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              )
-            : null,
+              ),
+            if (isAdmin)
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (v) {
+                  if (v == 'edit') {
+                    context.push('/products/${p['id']}/edit');
+                  } else if (v == 'delete') {
+                    _deleteProduct(p);
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }

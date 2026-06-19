@@ -5,6 +5,7 @@ import 'package:artemis_business_os/features/auth/presentation/screens/login_scr
 import 'package:artemis_business_os/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:artemis_business_os/features/customers/presentation/screens/customer_list_screen.dart';
 import 'package:artemis_business_os/features/customers/presentation/screens/create_customer_screen.dart';
+import 'package:artemis_business_os/features/customers/presentation/screens/edit_customer_screen.dart';
 import 'package:artemis_business_os/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:artemis_business_os/features/inventory/presentation/screens/inventory_item_detail_screen.dart';
 import 'package:artemis_business_os/features/inventory/presentation/screens/inventory_list_screen.dart';
@@ -15,13 +16,16 @@ import 'package:artemis_business_os/features/production/presentation/screens/bom
 import 'package:artemis_business_os/features/production/presentation/screens/boms_list_screen.dart';
 import 'package:artemis_business_os/features/production/presentation/screens/create_bom_screen.dart';
 import 'package:artemis_business_os/features/production/presentation/screens/create_production_batch_screen.dart';
+import 'package:artemis_business_os/features/production/presentation/screens/edit_bom_screen.dart';
 import 'package:artemis_business_os/features/production/presentation/screens/production_batches_screen.dart';
 import 'package:artemis_business_os/features/products/presentation/screens/create_product_screen.dart';
+import 'package:artemis_business_os/features/products/presentation/screens/edit_product_screen.dart';
 import 'package:artemis_business_os/features/products/presentation/screens/products_list_screen.dart';
 import 'package:artemis_business_os/features/reports/presentation/screens/reports_screen.dart';
 import 'package:artemis_business_os/features/sales/presentation/screens/create_sales_order_screen.dart';
 import 'package:artemis_business_os/features/sales/presentation/screens/sales_list_screen.dart';
 import 'package:artemis_business_os/features/users/presentation/screens/create_user_screen.dart';
+import 'package:artemis_business_os/features/users/presentation/screens/edit_user_screen.dart';
 import 'package:artemis_business_os/features/users/presentation/screens/users_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -184,6 +188,34 @@ final _routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/users/new',
         builder: (context, state) => const CreateUserScreen(),
+      ),
+      GoRoute(
+        path: '/users/:id/edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return EditUserScreen(userId: id);
+        },
+      ),
+      GoRoute(
+        path: '/customers/:id/edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return EditCustomerScreen(customerId: id);
+        },
+      ),
+      GoRoute(
+        path: '/products/:id/edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return EditProductScreen(productId: id);
+        },
+      ),
+      GoRoute(
+        path: '/production/boms/:id/edit',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return EditBomScreen(bomId: id);
+        },
       ),
     ],
   );

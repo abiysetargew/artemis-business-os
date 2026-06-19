@@ -286,10 +286,25 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
         trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
           onSelected: (v) {
-            if (v == 'toggle') _toggleActive(u);
-            if (v == 'delete') _delete(u);
+            if (v == 'edit') {
+              context.push('/users/${u['id']}/edit');
+            } else if (v == 'toggle') {
+              _toggleActive(u);
+            } else if (v == 'delete') {
+              _delete(u);
+            }
           },
           itemBuilder: (_) => [
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit, size: 18),
+                  SizedBox(width: 8),
+                  Text('Edit'),
+                ],
+              ),
+            ),
             PopupMenuItem(
               value: 'toggle',
               child: Row(

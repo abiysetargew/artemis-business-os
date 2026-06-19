@@ -1,9 +1,12 @@
+import 'package:artemis_business_os/core/network/api_errors.dart';
+import 'package:artemis_business_os/core/providers.dart';
+import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
+import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:artemis_business_os/core/providers.dart';
-import 'package:artemis_business_os/core/theme/app_theme.dart';
 
 class CustomerListScreen extends ConsumerStatefulWidget {
   const CustomerListScreen({super.key});
@@ -38,6 +41,30 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _deleteCustomer(Map<String, dynamic> customer) async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete Customer?',
+      message:
+          'Are you sure you want to delete "${customer['name']}"? This cannot be undone. Any unpaid sales will block the delete.',
+      confirmLabel: 'Delete',
+      type: ConfirmDialogType.destructive,
+    );
+    if (!confirmed) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.delete('/customers/${customer['id']}');
+      if (mounted) {
+        showAppSnackBar(context, message: 'Customer deleted', isSuccess: true);
+      }
+      _loadCustomers();
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, message: parseApiError(e), isError: true);
+      }
     }
   }
 
@@ -270,6 +297,7 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
   Widget _buildCustomerCard(Map<String, dynamic> customer) {
     final balance = customer['outstandingBalance'] as num;
     final hasBalance = balance > 0;
+    final isAdmin = ref.read(authNotifierProvider).user?.isAdmin ?? false;
 
     return Card(
       child: InkWell(
@@ -369,6 +397,39 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                   ),
                 ],
               ),
+              if (isAdmin)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (v) {
+                    if (v == 'edit') {
+                      context.push('/customers/${customer['id']}/edit');
+                    } else if (v == 'delete') {
+                      _deleteCustomer(customer);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),

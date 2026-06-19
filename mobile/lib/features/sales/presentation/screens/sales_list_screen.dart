@@ -1,9 +1,12 @@
+import 'package:artemis_business_os/core/network/api_errors.dart';
+import 'package:artemis_business_os/core/providers.dart';
+import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
+import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:artemis_business_os/core/providers.dart';
-import 'package:artemis_business_os/core/theme/app_theme.dart';
 
 class SalesListScreen extends ConsumerStatefulWidget {
   const SalesListScreen({super.key});
@@ -235,6 +238,63 @@ class _SalesListScreenState extends ConsumerState<SalesListScreen> {
                                     ),
                                   ),
                                 ),
+                                if (ref
+                                        .read(authNotifierProvider)
+                                        .user
+                                        ?.isAdmin ??
+                                    false)
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert, size: 20),
+                                    onSelected: (v) {
+                                      if (v == 'cancel' &&
+                                          !isCancelled &&
+                                          !isPaid) {
+                                        _cancelOrder(sale);
+                                      }
+                                    },
+                                    itemBuilder: (_) => [
+                                      if (!isCancelled && !isPaid)
+                                        const PopupMenuItem(
+                                          value: 'cancel',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.block,
+                                                size: 18,
+                                                color: Colors.red,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Cancel order',
+                                                style: TextStyle(
+                                                  color: Colors.red,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      if (isCancelled || isPaid)
+                                        const PopupMenuItem(
+                                          enabled: false,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.lock,
+                                                size: 18,
+                                                color: Colors.grey,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Cannot cancel',
+                                                style: TextStyle(
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                               ],
                             ),
                           ),
@@ -246,6 +306,30 @@ class _SalesListScreenState extends ConsumerState<SalesListScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _cancelOrder(Map<String, dynamic> sale) async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Cancel Order?',
+      message:
+          'Cancel ${sale['orderNumber']}? This will reverse the inventory deduction and any customer balance change. Cannot be undone.',
+      confirmLabel: 'Cancel Order',
+      type: ConfirmDialogType.destructive,
+    );
+    if (!confirmed) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.delete('/sales/${sale['id']}');
+      if (mounted) {
+        showAppSnackBar(context, message: 'Order cancelled', isSuccess: true);
+      }
+      _loadSales();
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, message: parseApiError(e), isError: true);
+      }
+    }
   }
 }
 

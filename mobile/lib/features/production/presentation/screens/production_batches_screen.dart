@@ -1,5 +1,8 @@
+import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
+import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -368,12 +371,63 @@ class _ProductionBatchesScreenState
                       )
                       .toList(),
                 ),
+                if (ref.read(authNotifierProvider).user?.isAdmin ?? false)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (v) {
+                        if (v == 'delete') {
+                          _deleteBatch(b);
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, size: 18, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text(
+                                'Delete batch',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _deleteBatch(Map<String, dynamic> b) async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete Production Batch?',
+      message:
+          'Are you sure you want to delete batch ${b['batchNumber']}? This will reverse the inventory changes (add raw materials back, remove finished goods). This cannot be undone.',
+      confirmLabel: 'Delete',
+      type: ConfirmDialogType.highImpact,
+    );
+    if (!confirmed) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.delete('/production/batches/${b['id']}');
+      if (mounted) {
+        showAppSnackBar(context, message: 'Batch deleted', isSuccess: true);
+      }
+      _load();
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, message: parseApiError(e), isError: true);
+      }
+    }
   }
 
   void _showBatchDetails(Map<String, dynamic> b) {

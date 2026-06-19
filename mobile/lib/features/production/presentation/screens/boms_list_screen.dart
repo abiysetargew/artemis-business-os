@@ -1,6 +1,7 @@
 import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -59,47 +60,25 @@ class _BomsListScreenState extends ConsumerState<BomsListScreen> {
   }
 
   Future<void> _deleteBOM(String id, String name) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete BOM?'),
-        content: Text(
-          'Are you sure you want to delete BOM for "$name"? This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete BOM?',
+      message:
+          'Are you sure you want to delete BOM for "$name"? This cannot be undone. If the BOM is used in any production batch, the delete will fail.',
+      confirmLabel: 'Delete',
+      type: ConfirmDialogType.destructive,
     );
-    if (confirm != true) return;
+    if (!confirmed) return;
     try {
       final api = ref.read(apiClientProvider);
       await api.delete('/production/boms/$id');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('BOM deleted'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        showAppSnackBar(context, message: 'BOM deleted', isSuccess: true);
       }
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(parseApiError(e)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnackBar(context, message: parseApiError(e), isError: true);
       }
     }
   }
@@ -355,13 +334,40 @@ class _BomsListScreenState extends ConsumerState<BomsListScreen> {
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.delete, size: 18, color: Colors.red),
-                    tooltip: 'Delete',
-                    onPressed: () => _deleteBOM(
-                      bom['id'] as String,
-                      '${bom['finishedProductName']} v${bom['version']}',
-                    ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (v) {
+                      if (v == 'delete') {
+                        _deleteBOM(
+                          bom['id'] as String,
+                          '${bom['finishedProductName']} v${bom['version']}',
+                        );
+                      } else if (v == 'edit') {
+                        context.push('/production/boms/${bom['id']}/edit');
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
