@@ -2,7 +2,7 @@
 # Install Flutter SDK on Vercel
 set -e
 
-FLUTTER_VERSION="3.24.5"
+FLUTTER_VERSION="3.44.2"
 FLUTTER_HOME="$HOME/flutter"
 MOBILE_DIR="$(pwd)/mobile"
 
