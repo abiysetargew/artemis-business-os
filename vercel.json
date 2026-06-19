@@ -1,9 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "cd mobile && flutter build web --release --dart-define=API_BASE_URL=https://artemis-backend-z0e6.onrender.com/api/v1",
+  "buildCommand": "bash vercel-build.sh",
   "outputDirectory": "mobile/build/web",
-  "installCommand": "cd mobile && flutter pub get",
+  "installCommand": "echo 'Skipping default install, see vercel-build.sh'",
   "framework": null,
+  "env": {
+    "API_BASE_URL": "https://artemis-backend-z0e6.onrender.com/api/v1"
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
