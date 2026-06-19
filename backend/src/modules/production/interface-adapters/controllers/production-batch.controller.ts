@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -16,6 +17,7 @@ import {
   ProductionBatchResponseDto,
 } from '../../application/dto/production-batch.dto';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
+import { Roles } from '../../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 
 @Controller('production/batches')
@@ -46,5 +48,14 @@ export class ProductionBatchController {
     @CurrentUser('id') userId: string,
   ): Promise<ProductionBatchResponseDto> {
     return this.batchUseCase.create(dto, userId);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles('ADMIN')
+  async delete(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    await this.batchUseCase.delete(id);
   }
 }

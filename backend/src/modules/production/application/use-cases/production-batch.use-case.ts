@@ -220,6 +220,100 @@ export class ProductionBatchUseCase {
     return this.enrichBatch(result);
   }
 
+  /**
+   * Reverse a production batch. Only allowed for ADMINs.
+   * Restores raw materials, removes finished goods, and records
+   * reversing inventory transactions. Then deletes the batch.
+   */
+  async delete(id: string): Promise<void> {
+    const batch = await this.prisma.productionBatch.findUnique({
+      where: { id },
+    });
+    if (!batch) {
+      throw new NotFoundException('Production batch not found');
+    }
+
+    // Get the BOM items to know which raw materials to restore
+    const bomItems = await this.prisma.billOfMaterialItem.findMany({
+      where: { bomId: batch.bomId },
+    });
+
+    // Calculate per-batch actual material consumption based on the batch's
+    // quantityProduced and the BOM quantities (the create used requiredQuantity
+    // which is bomQty * (batchQty / bom base unit). For simplicity, restore
+    // proportional to the batch's production amount vs. a 1-unit baseline.
+    const productionRatio = Number(batch.quantityProduced);
+
+    await this.prisma.$transaction(async (tx) => {
+      // Get the inventory item for the finished product
+      const fgInv = await tx.inventoryItem.findUnique({
+        where: { productId: batch.finishedProductId },
+      });
+
+      if (fgInv) {
+        if (Number(fgInv.currentQuantity) < productionRatio) {
+          throw new BadRequestException(
+            `Cannot delete batch: finished goods stock (${fgInv.currentQuantity}) is less than batch quantity (${productionRatio}). Adjust inventory first.`,
+          );
+        }
+
+        await tx.inventoryItem.update({
+          where: { id: fgInv.id },
+          data: {
+            currentQuantity: { decrement: productionRatio },
+            availableQuantity: { decrement: productionRatio },
+          },
+        });
+
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryItemId: fgInv.id,
+            transactionType: 'ADJUSTMENT_OUT',
+            quantity: productionRatio,
+            unitCostAtTransaction: Number(fgInv.averageCost),
+            notes: `Reversal of batch ${batch.batchNumber}`,
+            referenceEntityType: 'ProductionBatch',
+            referenceEntityId: batch.id,
+            userId: batch.userId,
+          },
+        });
+      }
+
+      // Restore the raw materials based on BOM quantities
+      for (const bomItem of bomItems) {
+        const restoreQty = Number(bomItem.quantity) * productionRatio;
+        const matInv = await tx.inventoryItem.findUnique({
+          where: { productId: bomItem.materialProductId },
+        });
+        if (!matInv) continue;
+
+        await tx.inventoryItem.update({
+          where: { id: matInv.id },
+          data: {
+            currentQuantity: { increment: restoreQty },
+            availableQuantity: { increment: restoreQty },
+          },
+        });
+
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryItemId: matInv.id,
+            transactionType: 'GOODS_RECEIPT',
+            quantity: restoreQty,
+            unitCostAtTransaction: Number(matInv.averageCost),
+            notes: `Material restoration from batch ${batch.batchNumber} deletion`,
+            referenceEntityType: 'ProductionBatch',
+            referenceEntityId: batch.id,
+            userId: batch.userId,
+          },
+        });
+      }
+
+      // Delete the batch
+      await tx.productionBatch.delete({ where: { id } });
+    });
+  }
+
   private async enrichBatch(batch: {
     id: string;
     batchNumber: string;
