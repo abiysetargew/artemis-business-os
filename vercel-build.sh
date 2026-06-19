@@ -4,6 +4,7 @@ set -e
 
 FLUTTER_VERSION="3.24.5"
 FLUTTER_HOME="$HOME/flutter"
+MOBILE_DIR="$(pwd)/mobile"
 
 if [ ! -d "$FLUTTER_HOME" ]; then
   echo "Installing Flutter $FLUTTER_VERSION..."
@@ -15,6 +16,12 @@ fi
 
 export PATH="$FLUTTER_HOME/bin:$PATH"
 git config --global --add safe.directory "$FLUTTER_HOME"
+
+# Suppress root warning
+export FLUTTER_SUPPRESS_ANALYTICS=true
+export BOT=true
+
+cd "$MOBILE_DIR"
 
 flutter --version
 flutter config --no-analytics --no-cli-animations
