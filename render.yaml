@@ -24,4 +24,4 @@ services:
       - key: PORT
         value: 3000
       - key: SEED_ON_BOOT
-        value: "false"
+        value: "true"

@@ -2,7 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { PrismaClient } from '@prisma/client';
 import { AppModule } from './app.module';
+import { seedIfEmpty } from './prisma/seed-if-empty';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -48,7 +50,23 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
+  // Auto-seed empty database on first boot
   const configService = app.get(ConfigService);
+  if ((configService.get<string>('SEED_ON_BOOT') || 'true') === 'true') {
+    try {
+      const prisma = new PrismaClient();
+      const result = await seedIfEmpty(prisma);
+      if (result) {
+        console.log('🌱 Database was empty - seeded default data');
+      } else {
+        console.log('✓ Database already has data - skipping seed');
+      }
+      await prisma.$disconnect();
+    } catch (e) {
+      console.error('⚠️  Auto-seed failed (non-fatal):', (e as Error).message);
+    }
+  }
+
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
 
