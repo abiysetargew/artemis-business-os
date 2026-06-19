@@ -10,6 +10,7 @@ import type {
   CreateBillOfMaterialDto,
   UpdateBillOfMaterialDto,
   BillOfMaterialResponseDto,
+  BOMItemResponseDto,
 } from '../dto/bill-of-material.dto';
 
 @Injectable()
@@ -25,7 +26,6 @@ export class BillOfMaterialUseCase {
     isActive?: boolean;
   }): Promise<BillOfMaterialResponseDto[]> {
     const boms = await this.bomRepository.findAll(filters);
-    // Enrich with product names
     const productIds = [...new Set(boms.map((b) => b.finishedProductId))];
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
@@ -39,7 +39,11 @@ export class BillOfMaterialUseCase {
       if (!bomWithItems) continue;
       const product = productMap.get(bom.finishedProductId);
       results.push(
-        this.toResponse(bomWithItems, product?.name ?? '', product?.sku ?? ''),
+        await this.toResponse(
+          bomWithItems,
+          product?.name ?? '',
+          product?.sku ?? '',
+        ),
       );
     }
     return results;
@@ -74,7 +78,6 @@ export class BillOfMaterialUseCase {
   async create(
     dto: CreateBillOfMaterialDto,
   ): Promise<BillOfMaterialResponseDto> {
-    // Validate finished product
     const product = await this.prisma.product.findUnique({
       where: { id: dto.finishedProductId },
       include: { category: true },
@@ -88,7 +91,6 @@ export class BillOfMaterialUseCase {
       );
     }
 
-    // Validate all material products
     const materialIds = dto.items.map((i) => i.materialProductId);
     const materials = await this.prisma.product.findMany({
       where: { id: { in: materialIds }, isActive: true },
@@ -100,7 +102,6 @@ export class BillOfMaterialUseCase {
       );
     }
 
-    // Ensure no finished good in materials
     for (const mat of materials) {
       if (mat.category.type === 'FINISHED_GOOD') {
         throw new BadRequestException(
@@ -109,7 +110,6 @@ export class BillOfMaterialUseCase {
       }
     }
 
-    // Check for duplicate version
     const existing = await this.prisma.billOfMaterial.findUnique({
       where: {
         finishedProductId_version: {
@@ -124,21 +124,33 @@ export class BillOfMaterialUseCase {
       );
     }
 
-    // If setting as active, deactivate others for this product
-    if (dto.isActive) {
-      await this.prisma.billOfMaterial.updateMany({
-        where: { finishedProductId: dto.finishedProductId, isActive: true },
-        data: { isActive: false },
-      });
-    }
+    const bom = await this.prisma.$transaction(async (tx) => {
+      if (dto.isActive) {
+        await tx.billOfMaterial.updateMany({
+          where: {
+            finishedProductId: dto.finishedProductId,
+            isActive: true,
+          },
+          data: { isActive: false },
+        });
+      }
 
-    const bom = await this.bomRepository.create({
-      finishedProductId: dto.finishedProductId,
-      version: dto.version,
-      effectiveDate: new Date(dto.effectiveDate),
-      notes: dto.notes,
-      isActive: dto.isActive ?? false,
-      items: dto.items,
+      return tx.billOfMaterial.create({
+        data: {
+          finishedProductId: dto.finishedProductId,
+          version: dto.version,
+          effectiveDate: new Date(dto.effectiveDate),
+          notes: dto.notes ?? null,
+          isActive: dto.isActive ?? false,
+          items: {
+            create: dto.items.map((i) => ({
+              materialProductId: i.materialProductId,
+              quantity: i.quantity,
+            })),
+          },
+        },
+        include: { items: true },
+      });
     });
 
     return this.toResponse(bom, product.name, product.sku);
@@ -154,7 +166,6 @@ export class BillOfMaterialUseCase {
     }
 
     if (dto.isActive === true) {
-      // Deactivate other BOMs for the same product
       await this.prisma.billOfMaterial.updateMany({
         where: {
           finishedProductId: existing.finishedProductId,
@@ -165,20 +176,24 @@ export class BillOfMaterialUseCase {
       });
     }
 
-    const bom = await this.bomRepository.update(id, {
-      version: dto.version,
-      effectiveDate: dto.effectiveDate
-        ? new Date(dto.effectiveDate)
-        : undefined,
-      notes: dto.notes,
-      isActive: dto.isActive,
+    const updated = await this.prisma.billOfMaterial.update({
+      where: { id },
+      data: {
+        version: dto.version,
+        effectiveDate: dto.effectiveDate
+          ? new Date(dto.effectiveDate)
+          : undefined,
+        notes: dto.notes ?? null,
+        isActive: dto.isActive,
+      },
+      include: { items: true },
     });
 
     const product = await this.prisma.product.findUnique({
-      where: { id: bom.finishedProductId },
+      where: { id: updated.finishedProductId },
       select: { name: true, sku: true },
     });
-    return this.toResponse(bom, product?.name ?? '', product?.sku ?? '');
+    return this.toResponse(updated, product?.name ?? '', product?.sku ?? '');
   }
 
   async delete(id: string): Promise<void> {
@@ -186,7 +201,6 @@ export class BillOfMaterialUseCase {
     if (!existing) {
       throw new NotFoundException('BOM not found');
     }
-    // Check if used in any production batch
     const usageCount = await this.prisma.productionBatch.count({
       where: { bomId: id },
     });
@@ -198,19 +212,7 @@ export class BillOfMaterialUseCase {
     await this.bomRepository.delete(id);
   }
 
-  private async toResponseWithItems(
-    bomId: string,
-  ): Promise<BillOfMaterialResponseDto | null> {
-    const bom = await this.bomRepository.findByIdWithItems(bomId);
-    if (!bom) return null;
-    const product = await this.prisma.product.findUnique({
-      where: { id: bom.finishedProductId },
-      select: { name: true, sku: true },
-    });
-    return this.toResponse(bom, product?.name ?? '', product?.sku ?? '');
-  }
-
-  private toResponse(
+  private async toResponse(
     bom: {
       id: string;
       finishedProductId: string;
@@ -228,7 +230,29 @@ export class BillOfMaterialUseCase {
     },
     productName: string,
     productSku: string,
-  ): BillOfMaterialResponseDto {
+  ): Promise<BillOfMaterialResponseDto> {
+    const items: Array<{ id: string; materialProductId: string; quantity: unknown }> =
+      bom.items ?? [];
+    let enrichedItems: BOMItemResponseDto[] = [];
+    if (items.length > 0) {
+      const materialIds = items.map((i) => i.materialProductId);
+      const materials = await this.prisma.product.findMany({
+        where: { id: { in: materialIds } },
+        select: { id: true, name: true, sku: true, unitOfMeasure: true },
+      });
+      const materialMap = new Map(materials.map((m) => [m.id, m]));
+      enrichedItems = items.map((i) => {
+        const m = materialMap.get(i.materialProductId);
+        return {
+          id: i.id,
+          materialProductId: i.materialProductId,
+          materialName: m?.name ?? 'Unknown',
+          materialSku: m?.sku ?? '',
+          unitOfMeasure: m?.unitOfMeasure ?? '',
+          quantity: Number(i.quantity),
+        };
+      });
+    }
     return {
       id: bom.id,
       finishedProductId: bom.finishedProductId,
@@ -238,7 +262,7 @@ export class BillOfMaterialUseCase {
       effectiveDate: bom.effectiveDate,
       notes: bom.notes,
       isActive: bom.isActive,
-      items: [], // Will be filled in findAll
+      items: enrichedItems,
       createdAt: bom.createdAt,
       updatedAt: bom.updatedAt,
     };

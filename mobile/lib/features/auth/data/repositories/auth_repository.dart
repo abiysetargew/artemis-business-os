@@ -22,12 +22,13 @@ class AuthRepository {
           data['accessToken'] as String,
           data['refreshToken'] as String,
         );
-        final user = User.fromJson(data['user'] as Map<String, dynamic>);
-        await _storage.saveUserData(user.name);
+        final userJson = data['user'] as Map<String, dynamic>;
+        final user = User.fromJson(userJson);
+        await _storage.saveUserJson(userJson);
         return user;
       }
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
@@ -40,7 +41,23 @@ class AuthRepository {
   }
 
   Future<User?> getStoredUser() async {
-    // For simplicity, return null - user will need to re-login
-    return null;
+    final cached = await _storage.getUserJson();
+    if (cached == null) return null;
+
+    final accessToken = await _storage.getAccessToken();
+    if (accessToken == null) return null;
+
+    try {
+      final response = await _apiClient.get('/auth/me');
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        final fresh = response.data as Map<String, dynamic>;
+        await _storage.saveUserJson(fresh);
+        return User.fromJson(fresh);
+      }
+      await _storage.clear();
+      return null;
+    } catch (_) {
+      return User.fromJson(cached);
+    }
   }
 }

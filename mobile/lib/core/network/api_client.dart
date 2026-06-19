@@ -1,13 +1,26 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/app_config.dart';
+import '../storage/secure_storage.dart';
 
 class ApiClient {
   late final Dio _dio;
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  late final Dio _refreshDio;
+  final SecureStorage _storage;
 
-  ApiClient() {
+  ApiClient({SecureStorage? storage}) : _storage = storage ?? SecureStorage() {
     _dio = Dio(
+      BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        connectTimeout: AppConfig.connectTimeout,
+        receiveTimeout: AppConfig.receiveTimeout,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
+
+    _refreshDio = Dio(
       BaseOptions(
         baseUrl: AppConfig.apiBaseUrl,
         connectTimeout: AppConfig.connectTimeout,
@@ -22,31 +35,34 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Attach auth token
-          final token = await _storage.read(key: AppConfig.accessTokenKey);
+          final token = await _storage.getAccessToken();
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
           return handler.next(options);
         },
         onError: (error, handler) async {
-          // Handle 401 - try to refresh token
           if (error.response?.statusCode == 401) {
+            final isRefreshCall = error.requestOptions.path.contains(
+              '/auth/refresh',
+            );
+            if (isRefreshCall) {
+              await _storage.clear();
+              return handler.next(error);
+            }
             final refreshed = await _refreshToken();
             if (refreshed) {
-              // Retry the request
               try {
-                final newToken = await _storage.read(
-                  key: AppConfig.accessTokenKey,
-                );
+                final newToken = await _storage.getAccessToken();
                 error.requestOptions.headers['Authorization'] =
                     'Bearer $newToken';
                 final response = await _dio.fetch(error.requestOptions);
                 return handler.resolve(response);
-              } catch (e) {
+              } catch (_) {
                 return handler.next(error);
               }
             }
+            await _storage.clear();
           }
           return handler.next(error);
         },
@@ -56,28 +72,24 @@ class ApiClient {
 
   Future<bool> _refreshToken() async {
     try {
-      final refreshToken = await _storage.read(key: AppConfig.refreshTokenKey);
+      final refreshToken = await _storage.getRefreshToken();
       if (refreshToken == null) return false;
 
-      final response = await _dio.post(
+      final response = await _refreshDio.post(
         '/auth/refresh',
         data: {'refreshToken': refreshToken},
-        options: Options(headers: {'Authorization': null}),
       );
 
       if (response.statusCode == 200) {
-        await _storage.write(
-          key: AppConfig.accessTokenKey,
-          value: response.data['accessToken'] as String,
-        );
-        await _storage.write(
-          key: AppConfig.refreshTokenKey,
-          value: response.data['refreshToken'] as String,
+        final data = response.data as Map<String, dynamic>;
+        await _storage.saveTokens(
+          data['accessToken'] as String,
+          data['refreshToken'] as String,
         );
         return true;
       }
       return false;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }

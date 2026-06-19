@@ -85,7 +85,8 @@ export class SalesUseCase {
       }
     }
 
-    // 3. Check inventory availability
+    // 3. Check inventory availability (initial pre-check for a fast, clear error message;
+    //    the authoritative check is re-done atomically inside the transaction below).
     const inventoryItems = await this.prisma.inventoryItem.findMany({
       where: { productId: { in: productIds } },
     });
@@ -123,7 +124,9 @@ export class SalesUseCase {
     // 5. Generate order number
     const orderNumber = await this.salesOrderRepository.generateOrderNumber();
 
-    // 6. Execute transaction: Create order, items, inventory deductions, and customer balance update
+    // 6. Execute transaction: Create order, items, atomic inventory deductions, and customer balance update.
+    //    Stock check is re-done here with a conditional update so two concurrent sales of
+    //    the last unit can't both succeed.
     const salesRepId = dto.salesRepresentativeId ?? userId;
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -158,18 +161,31 @@ export class SalesUseCase {
         ),
       );
 
-      // Deduct inventory and create inventory transactions
+      // Atomic stock deduction: only succeed if availableQuantity >= requested.
+      // The conditional WHERE prevents overselling under concurrency.
       for (const item of dto.items) {
         const inv = inventoryMap.get(item.productId);
-        if (!inv) continue;
+        if (!inv) {
+          throw new BadRequestException(`No inventory record for product`);
+        }
 
-        await tx.inventoryItem.update({
-          where: { id: inv.id },
+        const decrementResult = await tx.inventoryItem.updateMany({
+          where: {
+            id: inv.id,
+            availableQuantity: { gte: item.quantity },
+          },
           data: {
             currentQuantity: { decrement: item.quantity },
             availableQuantity: { decrement: item.quantity },
           },
         });
+
+        if (decrementResult.count === 0) {
+          const product = products.find((p) => p.id === item.productId);
+          throw new BadRequestException(
+            `Insufficient stock for "${product?.name}". Stock changed during checkout, please retry.`,
+          );
+        }
 
         await tx.inventoryTransaction.create({
           data: {
@@ -258,7 +274,7 @@ export class SalesUseCase {
 
       await tx.salesOrder.update({
         where: { id },
-        data: { isDeleted: true },
+        data: { isDeleted: true, cancelledAt: new Date() },
       });
     });
   }
@@ -276,6 +292,8 @@ export class SalesUseCase {
       region: string;
       city: string;
       notes: string | null;
+      isDeleted: boolean;
+      cancelledAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
     },
@@ -301,6 +319,8 @@ export class SalesUseCase {
       region: o.region,
       city: o.city,
       notes: o.notes,
+      isCancelled: o.isDeleted,
+      cancelledAt: o.cancelledAt,
       items: items.map((i) => ({
         id: i.id,
         productId: i.productId,

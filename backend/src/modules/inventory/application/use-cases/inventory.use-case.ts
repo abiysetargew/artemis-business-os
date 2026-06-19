@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import type { InventoryItemRepository } from '../../domain/repositories/inventory-item.repository';
 import type { InventoryTransactionRepository } from '../../domain/repositories/inventory-transaction.repository';
 import {
@@ -20,6 +21,7 @@ export class InventoryUseCase {
     private readonly itemRepository: InventoryItemRepository,
     @Inject('INVENTORY_TRANSACTION_REPOSITORY')
     private readonly transactionRepository: InventoryTransactionRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
   async findAllItems(filters?: {
@@ -59,6 +61,7 @@ export class InventoryUseCase {
    * Create an inventory adjustment (In/Out).
    * - IN: Increases stock, updates lastPurchaseCost, recalculates averageCost.
    * - OUT: Decreases stock. Will throw if it would result in negative stock.
+   * All writes (item + ledger) are wrapped in a single Prisma transaction.
    */
   async createAdjustment(
     dto: CreateAdjustmentDto,
@@ -86,23 +89,30 @@ export class InventoryUseCase {
         quantity * unitCost;
       const newAverageCost = newQuantity > 0 ? newTotalCost / newQuantity : 0;
 
-      const updated = await this.itemRepository.updateQuantity(item.id, {
-        currentQuantity: newQuantity,
-        availableQuantity: newQuantity,
-        averageCost: newAverageCost,
-        lastPurchaseCost: unitCost,
+      const updatedRow = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.inventoryItem.update({
+          where: { id: item.id },
+          data: {
+            currentQuantity: newQuantity,
+            availableQuantity: newQuantity,
+            averageCost: newAverageCost,
+            lastPurchaseCost: unitCost,
+          },
+        });
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryItemId: item.id,
+            transactionType: 'GOODS_RECEIPT',
+            quantity,
+            unitCostAtTransaction: unitCost,
+            notes: dto.notes,
+            userId,
+          },
+        });
+        return updated;
       });
 
-      await this.transactionRepository.create({
-        inventoryItemId: item.id,
-        transactionType: 'GOODS_RECEIPT',
-        quantity,
-        unitCostAtTransaction: unitCost,
-        notes: dto.notes,
-        userId,
-      });
-
-      return this.toItemResponse(updated);
+      return this.toItemResponse(updatedRow);
     } else {
       // OUT
       if (Number(item.currentQuantity) < quantity) {
@@ -112,21 +122,28 @@ export class InventoryUseCase {
       }
 
       const newQuantity = Number(item.currentQuantity) - quantity;
-      const updated = await this.itemRepository.updateQuantity(item.id, {
-        currentQuantity: newQuantity,
-        availableQuantity: newQuantity,
+      const updatedRow = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.inventoryItem.update({
+          where: { id: item.id },
+          data: {
+            currentQuantity: newQuantity,
+            availableQuantity: newQuantity,
+          },
+        });
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryItemId: item.id,
+            transactionType: 'ADJUSTMENT_OUT',
+            quantity,
+            unitCostAtTransaction: Number(item.averageCost),
+            notes: dto.notes,
+            userId,
+          },
+        });
+        return updated;
       });
 
-      await this.transactionRepository.create({
-        inventoryItemId: item.id,
-        transactionType: 'ADJUSTMENT_OUT',
-        quantity,
-        unitCostAtTransaction: Number(item.averageCost),
-        notes: dto.notes,
-        userId,
-      });
-
-      return this.toItemResponse(updated);
+      return this.toItemResponse(updatedRow);
     }
   }
 

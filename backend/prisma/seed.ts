@@ -236,6 +236,181 @@ async function main() {
   }
   console.log(`  ✓ Created ${finishedGoods.length} finished goods\n`);
 
+  // 10. Create Default BOMs (one active BOM per finished good)
+  console.log('🧾 Creating default BOMs...');
+  const skuFor = async (sku: string) =>
+    prisma.product.findUnique({ where: { sku } });
+  const allByName = async (name: string) =>
+    prisma.product.findFirst({ where: { name } });
+
+  const ena = await skuFor('RM-ENA-ALCOHOL');
+  const water = await skuFor('RM-WATER');
+  const sugar = await skuFor('RM-SUGAR');
+  const citric = await skuFor('RM-CITRIC-ACID');
+  const ginFlavor = await skuFor('FLAVOR-GIN');
+  const ouzoFlavor = await skuFor('FLAVOR-OUZO');
+  const lemonFlavor = await skuFor('FLAVOR-LEMON');
+  const supermintFlavor = await skuFor('FLAVOR-SUPERMINT');
+  const lemonColoring = await skuFor('COLOR-LEMON');
+  const greenColoring = await skuFor('COLOR-GREEN');
+
+  const boms: Array<{
+    fgSku: string;
+    version: string;
+    items: Array<{ productId: string; quantity: number }>;
+  }> = [];
+
+  const buildBottleItems = (
+    alcohol: { id: string },
+    flavor: { id: string } | null,
+    bottleSku: string,
+    capSku: string,
+    labelSku: string,
+    flavorQty: number,
+    extraColor: { id: string } | null = null,
+  ) => {
+    const items: Array<{ productId: string; quantity: number }> = [];
+    if (!alcohol) return items;
+    items.push({ productId: alcohol.id, quantity: 0.5 });
+    if (water) items.push({ productId: water.id, quantity: 0.4 });
+    if (flavor) items.push({ productId: flavor.id, quantity: flavorQty });
+    if (extraColor) items.push({ productId: extraColor.id, quantity: 0.01 });
+    if (sugar) items.push({ productId: sugar.id, quantity: 0.05 });
+    if (citric) items.push({ productId: citric.id, quantity: 0.005 });
+    return items;
+  };
+
+  const bottle1L = await skuFor('PKG-BOTTLE-1L');
+  const bottle250 = await skuFor('PKG-BOTTLE-250ML');
+
+  if (bottle1L && bottle250 && ena && water && sugar && citric) {
+    if (ginFlavor) {
+      boms.push({
+        fgSku: 'FIKIR-GIN-1L',
+        version: '1',
+        items: [
+          { productId: ena.id, quantity: 0.5 },
+          { productId: water.id, quantity: 0.4 },
+          { productId: ginFlavor.id, quantity: 0.05 },
+          { productId: sugar.id, quantity: 0.05 },
+          { productId: citric.id, quantity: 0.005 },
+        ],
+      });
+      boms.push({
+        fgSku: 'FIKIR-GIN-250ML',
+        version: '1',
+        items: [
+          { productId: ena.id, quantity: 0.125 },
+          { productId: water.id, quantity: 0.1 },
+          { productId: ginFlavor.id, quantity: 0.012 },
+          { productId: sugar.id, quantity: 0.012 },
+          { productId: citric.id, quantity: 0.0015 },
+        ],
+      });
+    }
+    if (ouzoFlavor) {
+      boms.push({
+        fgSku: 'FIKIR-OUZO-1L',
+        version: '1',
+        items: [
+          { productId: ena.id, quantity: 0.5 },
+          { productId: water.id, quantity: 0.4 },
+          { productId: ouzoFlavor.id, quantity: 0.08 },
+          { productId: sugar.id, quantity: 0.05 },
+        ],
+      });
+      boms.push({
+        fgSku: 'FIKIR-OUZO-250ML',
+        version: '1',
+        items: [
+          { productId: ena.id, quantity: 0.125 },
+          { productId: water.id, quantity: 0.1 },
+          { productId: ouzoFlavor.id, quantity: 0.02 },
+          { productId: sugar.id, quantity: 0.012 },
+        ],
+      });
+    }
+    if (lemonFlavor) {
+      boms.push({
+        fgSku: 'FIKIR-LEMON-1L',
+        version: '1',
+        items: [
+          { productId: ena.id, quantity: 0.4 },
+          { productId: water.id, quantity: 0.5 },
+          { productId: lemonFlavor.id, quantity: 0.08 },
+          ...(lemonColoring ? [{ productId: lemonColoring.id, quantity: 0.01 }] : []),
+          { productId: sugar.id, quantity: 0.1 },
+          { productId: citric.id, quantity: 0.01 },
+        ],
+      });
+      boms.push({
+        fgSku: 'FIKIR-LEMON-250ML',
+        version: '1',
+        items: [
+          { productId: ena.id, quantity: 0.1 },
+          { productId: water.id, quantity: 0.125 },
+          { productId: lemonFlavor.id, quantity: 0.02 },
+          ...(lemonColoring ? [{ productId: lemonColoring.id, quantity: 0.0025 }] : []),
+          { productId: sugar.id, quantity: 0.025 },
+          { productId: citric.id, quantity: 0.0025 },
+        ],
+      });
+    }
+    if (supermintFlavor) {
+      boms.push({
+        fgSku: 'FIKIR-SUPERMINT-1L',
+        version: '1',
+        items: [
+          { productId: ena.id, quantity: 0.45 },
+          { productId: water.id, quantity: 0.45 },
+          { productId: supermintFlavor.id, quantity: 0.08 },
+          ...(greenColoring ? [{ productId: greenColoring.id, quantity: 0.01 }] : []),
+          { productId: sugar.id, quantity: 0.1 },
+        ],
+      });
+      boms.push({
+        fgSku: 'FIKIR-SUPERMINT-250ML',
+        version: '1',
+        items: [
+          { productId: ena.id, quantity: 0.112 },
+          { productId: water.id, quantity: 0.112 },
+          { productId: supermintFlavor.id, quantity: 0.02 },
+          ...(greenColoring ? [{ productId: greenColoring.id, quantity: 0.0025 }] : []),
+          { productId: sugar.id, quantity: 0.025 },
+        ],
+      });
+    }
+  }
+
+  let bomCount = 0;
+  for (const b of boms) {
+    const fg = await skuFor(b.fgSku);
+    if (!fg) continue;
+    await prisma.billOfMaterial.upsert({
+      where: {
+        finishedProductId_version: {
+          finishedProductId: fg.id,
+          version: b.version,
+        },
+      },
+      update: {},
+      create: {
+        finishedProductId: fg.id,
+        version: b.version,
+        effectiveDate: new Date(),
+        isActive: true,
+        items: {
+          create: b.items.map((i) => ({
+            materialProduct: { connect: { id: i.productId } },
+            quantity: i.quantity,
+          })),
+        },
+      },
+    });
+    bomCount += 1;
+  }
+  console.log(`  ✓ Created ${bomCount} default BOMs\n`);
+
   // 10. Create Sample Customers
   console.log('🏢 Creating sample customers...');
   const customers = [

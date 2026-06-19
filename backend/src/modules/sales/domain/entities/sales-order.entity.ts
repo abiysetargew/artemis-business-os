@@ -11,6 +11,7 @@ export class SalesOrderEntity {
   city: string;
   notes: string | null;
   isDeleted: boolean;
+  cancelledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 

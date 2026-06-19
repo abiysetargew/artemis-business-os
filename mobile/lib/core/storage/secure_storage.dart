@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/app_config.dart';
 
@@ -23,11 +25,17 @@ class SecureStorage {
     await _storage.delete(key: AppConfig.userDataKey);
   }
 
-  Future<void> saveUserData(String userData) async {
-    await _storage.write(key: AppConfig.userDataKey, value: userData);
+  Future<void> saveUserJson(Map<String, dynamic> user) async {
+    await _storage.write(key: AppConfig.userDataKey, value: jsonEncode(user));
   }
 
-  Future<String?> getUserData() async {
-    return await _storage.read(key: AppConfig.userDataKey);
+  Future<Map<String, dynamic>?> getUserJson() async {
+    final raw = await _storage.read(key: AppConfig.userDataKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } catch (_) {}
+    return null;
   }
 }

@@ -1,12 +1,7 @@
-import 'package:artemis_business_os/core/network/api_client.dart';
-import 'package:artemis_business_os/core/storage/secure_storage.dart';
+import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/features/auth/data/repositories/auth_repository.dart';
 import 'package:artemis_business_os/features/auth/domain/entities/user.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
-
-final secureStorageProvider = Provider<SecureStorage>((ref) => SecureStorage());
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
@@ -19,14 +14,27 @@ class AuthState {
   final User? user;
   final bool isLoading;
   final String? error;
+  final bool initialized;
 
-  const AuthState({this.user, this.isLoading = false, this.error});
+  const AuthState({
+    this.user,
+    this.isLoading = false,
+    this.error,
+    this.initialized = false,
+  });
 
-  AuthState copyWith({User? user, bool? isLoading, String? error}) {
+  AuthState copyWith({
+    User? user,
+    bool? isLoading,
+    String? error,
+    bool? initialized,
+    bool clearUser = false,
+  }) {
     return AuthState(
-      user: user ?? this.user,
+      user: clearUser ? null : (user ?? this.user),
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      initialized: initialized ?? this.initialized,
     );
   }
 }
@@ -41,7 +49,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final result = await _repository.login(email, password);
       if (result != null) {
-        state = AuthState(user: result);
+        state = AuthState(user: result, initialized: true);
         return true;
       }
       state = state.copyWith(isLoading: false, error: 'Login failed');
@@ -54,13 +62,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _repository.logout();
-    state = const AuthState();
+    state = const AuthState(initialized: true);
   }
 
   Future<void> checkAuth() async {
-    final user = await _repository.getStoredUser();
-    if (user != null) {
-      state = AuthState(user: user);
+    try {
+      final user = await _repository.getStoredUser();
+      state = AuthState(user: user, initialized: true);
+    } catch (_) {
+      state = const AuthState(initialized: true);
     }
   }
 }

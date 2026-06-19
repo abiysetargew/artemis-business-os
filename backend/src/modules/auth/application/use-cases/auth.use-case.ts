@@ -73,8 +73,15 @@ export class AuthUseCase {
     const tokenHash = this.hashToken(refreshToken);
     const storedToken = await this.refreshTokenRepository.findByHash(tokenHash);
 
-    if (!storedToken || storedToken.revoked || storedToken.isExpired()) {
+    if (!storedToken || storedToken.isExpired()) {
       throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (storedToken.revoked) {
+      await this.refreshTokenRepository.revokeAllForUser(storedToken.userId);
+      throw new UnauthorizedException(
+        'Refresh token reuse detected. All sessions revoked.',
+      );
     }
 
     const user = await this.userRepository.findById(storedToken.userId);
@@ -116,7 +123,6 @@ export class AuthUseCase {
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      secret: process.env.JWT_SECRET ?? 'fallback-secret',
       expiresIn: (process.env.JWT_EXPIRES_IN ??
         '15m') as `${number}${'s' | 'm' | 'h' | 'd'}`,
     });

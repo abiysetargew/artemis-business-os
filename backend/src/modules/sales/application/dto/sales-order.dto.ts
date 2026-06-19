@@ -82,6 +82,8 @@ export class SalesOrderResponseDto {
   region: string;
   city: string;
   notes: string | null;
+  isCancelled: boolean;
+  cancelledAt: Date | null;
   items: SalesOrderItemResponseDto[];
   createdAt: Date;
   updatedAt: Date;

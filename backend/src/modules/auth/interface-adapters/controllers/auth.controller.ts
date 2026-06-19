@@ -16,6 +16,7 @@ import {
   TokenResponseDto,
 } from '../../application/dto/auth-response.dto';
 import { Public } from '../../../../common/decorators/public.decorator';
+import { Roles } from '../../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 
@@ -23,7 +24,7 @@ import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 export class AuthController {
   constructor(private readonly authUseCase: AuthUseCase) {}
 
-  @Public()
+  @Roles('ADMIN')
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: CreateUserDto): Promise<AuthResponseDto> {

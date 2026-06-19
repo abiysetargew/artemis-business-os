@@ -18,7 +18,6 @@ class AppTheme {
         secondary: secondaryColor,
         error: errorColor,
         surface: surfaceColor,
-        background: backgroundColor,
       ),
       scaffoldBackgroundColor: backgroundColor,
       appBarTheme: const AppBarTheme(

@@ -1,10 +1,18 @@
 class AppConfig {
-  // API Base URL
-  // For Web (Chrome/Edge on same computer): http://localhost:3000/api/v1
-  // For Android with ADB Reverse: http://localhost:3000/api/v1 (after adb reverse tcp:3000 tcp:3000)
-  // For Android Emulator: http://10.0.2.2:3000/api/v1
-  // For real device on same WiFi: http://YOUR_COMPUTER_IP:3000/api/v1
-  static const String apiBaseUrl = 'http://localhost:3000/api/v1';
+  static const String _envApiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:4040/api/v1',
+  );
+
+  static const String _envFallbackUrlsCsv = String.fromEnvironment(
+    'API_FALLBACK_URLS',
+    defaultValue:
+        'http://10.0.2.2:4040/api/v1,https://kilobyte-enactment-bounding.ngrok-free.dev/api/v1',
+  );
+
+  static String get apiBaseUrl => _envApiBaseUrl;
+
+  static List<String> get fallbackUrls => _envFallbackUrlsCsv.split(',');
 
   static const String appName = 'Artemis Business OS';
   static const String appVersion = '1.0.0';

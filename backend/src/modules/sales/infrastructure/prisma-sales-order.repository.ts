@@ -137,6 +137,7 @@ export class PrismaSalesOrderRepository implements SalesOrderRepository {
     city: string;
     notes: string | null;
     isDeleted: boolean;
+    cancelledAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
   }): SalesOrderEntity => {
@@ -153,6 +154,7 @@ export class PrismaSalesOrderRepository implements SalesOrderRepository {
       city: o.city,
       notes: o.notes,
       isDeleted: o.isDeleted,
+      cancelledAt: o.cancelledAt,
       createdAt: o.createdAt,
       updatedAt: o.updatedAt,
     });
