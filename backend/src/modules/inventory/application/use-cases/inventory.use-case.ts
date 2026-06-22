@@ -29,7 +29,7 @@ export class InventoryUseCase {
     lowStockOnly?: boolean;
   }): Promise<InventoryItemResponseDto[]> {
     const items = await this.itemRepository.findAll(filters);
-    return items.map((i) => this.toItemResponse(i));
+    return this.enrichAndMap(items);
   }
 
   async findItemById(id: string): Promise<InventoryItemResponseDto> {
@@ -37,12 +37,34 @@ export class InventoryUseCase {
     if (!item) {
       throw new NotFoundException('Inventory item not found');
     }
-    return this.toItemResponse(item);
+    return (await this.enrichAndMap([item]))[0];
   }
 
   async findLowStock(): Promise<InventoryItemResponseDto[]> {
     const items = await this.itemRepository.findLowStock();
-    return items.map((i) => this.toItemResponse(i));
+    return this.enrichAndMap(items);
+  }
+
+  private async enrichAndMap(
+    items: Array<{
+      id: string;
+      productId: string;
+      currentQuantity: unknown;
+      availableQuantity: unknown;
+      averageCost: unknown;
+      lastPurchaseCost: unknown;
+      createdAt: Date;
+      updatedAt: Date;
+    }>,
+  ): Promise<InventoryItemResponseDto[]> {
+    if (items.length === 0) return [];
+    const productIds = [...new Set(items.map((i) => i.productId))];
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+      include: { category: true },
+    });
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    return items.map((i) => this.toItemResponse(i, productMap.get(i.productId)));
   }
 
   async getTransactions(
@@ -54,7 +76,9 @@ export class InventoryUseCase {
     }
     const transactions =
       await this.transactionRepository.findByInventoryItemId(inventoryItemId);
-    return transactions.map((t) => this.toTransactionResponse(t));
+    return Promise.all(
+      transactions.map((t) => this.toTransactionResponse(t)),
+    );
   }
 
   /**
@@ -112,7 +136,7 @@ export class InventoryUseCase {
         return updated;
       });
 
-      return this.toItemResponse(updatedRow);
+      return (await this.enrichAndMap([updatedRow]))[0];
     } else {
       // OUT
       if (Number(item.currentQuantity) < quantity) {
@@ -143,7 +167,7 @@ export class InventoryUseCase {
         return updated;
       });
 
-      return this.toItemResponse(updatedRow);
+      return (await this.enrichAndMap([updatedRow]))[0];
     }
   }
 
@@ -157,48 +181,66 @@ export class InventoryUseCase {
     }
   }
 
-  private toItemResponse(item: {
-    id: string;
-    productId: string;
-    currentQuantity: unknown;
-    availableQuantity: unknown;
-    averageCost: unknown;
-    lastPurchaseCost: unknown;
-    createdAt: Date;
-    updatedAt: Date;
-  }): InventoryItemResponseDto {
+  private toItemResponse(
+    item: {
+      id: string;
+      productId: string;
+      currentQuantity: unknown;
+      availableQuantity: unknown;
+      averageCost: unknown;
+      lastPurchaseCost: unknown;
+      createdAt: Date;
+      updatedAt: Date;
+    },
+    product?: {
+      name: string;
+      sku: string;
+      unitOfMeasure: string;
+      reorderPoint: unknown;
+      category: { type: string };
+    },
+  ): InventoryItemResponseDto {
+    const qty = Number(item.currentQuantity);
+    const avgCost = Number(item.averageCost);
+    const reorderPoint = Number(product?.reorderPoint ?? 0);
     return {
       id: item.id,
       productId: item.productId,
-      productName: '',
-      productSku: '',
-      categoryType: '',
-      currentQuantity: Number(item.currentQuantity),
+      productName: product?.name ?? '',
+      productSku: product?.sku ?? '',
+      categoryType: product?.category.type ?? '',
+      currentQuantity: qty,
       availableQuantity: Number(item.availableQuantity),
-      averageCost: Number(item.averageCost),
+      averageCost: avgCost,
       lastPurchaseCost: Number(item.lastPurchaseCost),
-      unitOfMeasure: '',
-      reorderPoint: 0,
-      isLowStock: false,
-      inventoryValue: Number(item.currentQuantity) * Number(item.averageCost),
+      unitOfMeasure: product?.unitOfMeasure ?? '',
+      reorderPoint,
+      isLowStock: qty <= reorderPoint,
+      inventoryValue: qty * avgCost,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     };
   }
 
-  private toTransactionResponse(t: {
-    id: string;
-    inventoryItemId: string;
-    transactionType: string;
-    quantity: unknown;
-    unitCostAtTransaction: unknown;
-    transactionDate: Date;
-    notes: string | null;
-    referenceEntityType: string | null;
-    referenceEntityId: string | null;
-    userId: string;
-    createdAt: Date;
-  }): InventoryTransactionResponseDto {
+  private async toTransactionResponse(
+    t: {
+      id: string;
+      inventoryItemId: string;
+      transactionType: string;
+      quantity: unknown;
+      unitCostAtTransaction: unknown;
+      transactionDate: Date;
+      notes: string | null;
+      referenceEntityType: string | null;
+      referenceEntityId: string | null;
+      userId: string;
+      createdAt: Date;
+    },
+  ): Promise<InventoryTransactionResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: t.userId },
+      select: { name: true },
+    });
     return {
       id: t.id,
       inventoryItemId: t.inventoryItemId,
@@ -211,7 +253,7 @@ export class InventoryUseCase {
       referenceEntityType: t.referenceEntityType,
       referenceEntityId: t.referenceEntityId,
       userId: t.userId,
-      userName: '',
+      userName: user?.name ?? '',
       createdAt: t.createdAt,
     };
   }
