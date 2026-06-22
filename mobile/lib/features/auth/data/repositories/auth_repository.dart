@@ -1,4 +1,5 @@
 import 'package:artemis_business_os/core/network/api_client.dart';
+import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/storage/secure_storage.dart';
 import 'package:artemis_business_os/features/auth/domain/entities/user.dart';
 
@@ -27,9 +28,11 @@ class AuthRepository {
         await _storage.saveUserJson(userJson);
         return user;
       }
-      return null;
-    } catch (_) {
-      return null;
+      throw Exception(
+        'Login failed (${response.statusCode}). Please try again.',
+      );
+    } catch (e) {
+      throw Exception(parseApiError(e));
     }
   }
 
