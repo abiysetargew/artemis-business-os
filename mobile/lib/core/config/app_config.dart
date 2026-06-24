@@ -10,7 +10,22 @@ class AppConfig {
         'http://10.0.2.2:4040/api/v1,https://kilobyte-enactment-bounding.ngrok-free.dev/api/v1',
   );
 
-  static String get apiBaseUrl => _envApiBaseUrl;
+  /// Returns the API base URL, resolving relative paths against the current
+  /// browser origin so a single host can serve both the Flutter web app
+  /// and the API (e.g. on Render). For absolute URLs, returns them unchanged.
+  static String get apiBaseUrl {
+    final env = _envApiBaseUrl;
+    if (env.startsWith('/')) {
+      // In a web context, resolve against window.location.origin.
+      try {
+        // ignore: avoid_print
+        return '${Uri.base.origin}$env';
+      } catch (_) {
+        return env;
+      }
+    }
+    return env;
+  }
 
   static List<String> get fallbackUrls => _envFallbackUrlsCsv.split(',');
 

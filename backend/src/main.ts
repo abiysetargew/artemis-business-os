@@ -2,14 +2,19 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import { AppModule } from './app.module';
 import { seedIfEmpty } from './prisma/seed-if-empty';
+import { join } from 'path';
+import { existsSync } from 'fs';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['health'],
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -28,6 +33,16 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
+
+  // Serve Flutter web build at the root path so a single Render URL hosts
+  // the entire application (frontend + API). API remains under /api/v1/*.
+  const webRoot = join(process.cwd(), '..', 'mobile', 'build', 'web');
+  if (existsSync(webRoot)) {
+    app.useStaticAssets(webRoot, { prefix: '/' });
+    console.log(`[web] Serving Flutter app from ${webRoot}`);
+  } else {
+    console.log(`[web] Flutter web build not found at ${webRoot}`);
+  }
 
   // Swagger API Documentation
   const swaggerConfig = new DocumentBuilder()
@@ -57,24 +72,23 @@ async function bootstrap() {
       const prisma = new PrismaClient();
       const result = await seedIfEmpty(prisma);
       if (result) {
-        console.log('=�� Database was empty - seeded default data');
+        console.log('=[seed] Database was empty - seeded default data');
       } else {
-        console.log('G�� Database already has data - skipping seed');
+        console.log('=[seed] Database already has data - skipping seed');
       }
       await prisma.$disconnect();
     } catch (e) {
-      console.error('G��n+�  Auto-seed failed (non-fatal):', (e as Error).message);
+      console.error('=[seed] Auto-seed failed (non-fatal):', (e as Error).message);
     }
   }
 
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
 
-  console.log(
-    `=��� Artemis Business OS API v2 running on: http://localhost:${port}/api/v1`,
-  );
-  console.log(`=��� Health check: http://localhost:${port}/api/v1/health`);
-  console.log(`=��� API docs: http://localhost:${port}/api/docs`);
+  console.log(`[api] Artemis Business OS API running on: http://localhost:${port}/api/v1`);
+  console.log(`[api] Health check: http://localhost:${port}/api/v1/health`);
+  console.log(`[api] API docs: http://localhost:${port}/api/docs`);
+  console.log(`[web] Open the app at: http://localhost:${port}/`);
 }
 
 void bootstrap();
