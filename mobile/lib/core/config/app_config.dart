@@ -15,7 +15,7 @@ class AppConfig {
   static List<String> get fallbackUrls => _envFallbackUrlsCsv.split(',');
 
   static const String appName = 'Artemis Business OS';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.1.0';
 
   // Storage keys
   static const String accessTokenKey = 'access_token';
