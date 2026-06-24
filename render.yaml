@@ -6,23 +6,8 @@ services:
     plan: free
     buildCommand: |
       npm install && npx prisma generate && npx nest build && \
-      cd .. && \
-      if [ ! -d "$HOME/flutter" ]; then
-        echo "Installing Flutter..."
-        curl -fsSL https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.44.2-stable.tar.xz -o /tmp/flutter.tar.xz
-        tar xf /tmp/flutter.tar.xz -C "$HOME"
-        rm /tmp/flutter.tar.xz
-      fi && \
-      export PATH="$HOME/flutter/bin:$PATH" && \
-      git config --global --add safe.directory "$HOME/flutter" && \
-      export FLUTTER_SUPPRESS_ANALYTICS=true BOT=true && \
-      cd mobile && \
-      flutter config --no-analytics --no-cli-animations && \
-      flutter precache --no-android --no-ios --no-windows --no-macos --no-linux --web && \
-      flutter pub get && \
-      flutter build web --release \
-        --dart-define=API_BASE_URL=/api/v1 \
-        --no-tree-shake-icons
+      echo "Flutter web bundle pre-built and committed at mobile/build/web - no install needed" && \
+      ls -la ../mobile/build/web | head -20
     startCommand: npx prisma migrate deploy && node dist/main.js
     autoDeploy: true
     healthCheckPath: /health
