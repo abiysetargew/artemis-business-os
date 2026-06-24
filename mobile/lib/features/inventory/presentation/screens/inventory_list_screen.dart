@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/widgets/main_shell.dart';
 
 class InventoryListScreen extends ConsumerStatefulWidget {
   const InventoryListScreen({super.key});
@@ -70,12 +71,18 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inventory'),
+      appBar: BrandedAppBar(
+        title: 'Inventory',
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadInventory,
+            tooltip: 'Refresh',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_rounded),
+            onPressed: () => context.push('/settings'),
+            tooltip: 'Settings',
           ),
         ],
       ),
@@ -253,7 +260,9 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: _getCategoryColor(type).withValues(alpha: 0.15),
+                backgroundColor: _getCategoryColor(
+                  type,
+                ).withValues(alpha: 0.15),
                 child: Icon(
                   _getCategoryIcon(type),
                   color: _getCategoryColor(type),

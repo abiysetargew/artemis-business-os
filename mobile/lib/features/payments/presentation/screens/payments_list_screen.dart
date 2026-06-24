@@ -2,12 +2,13 @@ import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
 import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
+import 'package:artemis_business_os/core/widgets/data_card.dart';
+import 'package:artemis_business_os/core/widgets/main_shell.dart';
 import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:shimmer/shimmer.dart';
 
 class PaymentsListScreen extends ConsumerStatefulWidget {
   const PaymentsListScreen({super.key});
@@ -20,7 +21,7 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
   List<dynamic> _allPayments = [];
   List<dynamic> _filteredPayments = [];
   bool _isLoading = true;
-  String _statusFilter = 'ALL'; // ALL, PENDING, VERIFIED, REJECTED
+  String _statusFilter = 'ALL';
   String _searchQuery = '';
 
   @override
@@ -57,7 +58,8 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
       final q = _searchQuery.toLowerCase();
       filtered = filtered.where((p) {
         return (p['customerName'] as String).toLowerCase().contains(q) ||
-            (p['referenceNumber'] as String? ?? '').toLowerCase().contains(q);
+            (p['referenceNumber'] as String? ?? '').toLowerCase().contains(q) ||
+            (p['salesOrderNumber'] as String? ?? '').toLowerCase().contains(q);
       }).toList();
     }
 
@@ -67,14 +69,26 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Payments'),
+      appBar: BrandedAppBar(
+        title: 'Payments',
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadPayments),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _loadPayments,
+            tooltip: 'Refresh',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_rounded),
+            onPressed: () => context.push('/settings'),
+            tooltip: 'Settings',
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/payments/create'),
+        onPressed: () async {
+          await context.push('/payments/create');
+          _loadPayments();
+        },
         icon: const Icon(Icons.add),
         label: const Text('New Payment'),
         backgroundColor: AppTheme.successColor,
@@ -83,10 +97,10 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Search by customer or reference...',
+                hintText: 'Search by customer, invoice, or reference...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -97,6 +111,7 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
                         },
                       )
                     : null,
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
               onChanged: (v) {
                 setState(() => _searchQuery = v);
@@ -105,47 +120,40 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
             ),
           ),
           SizedBox(
-            height: 50,
+            height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 _FilterChip(
                   label: 'All',
-                  value: 'ALL',
-                  current: _statusFilter,
-                  onTap: (v) {
-                    setState(() => _statusFilter = v);
+                  selected: _statusFilter == 'ALL',
+                  onTap: () {
+                    setState(() => _statusFilter = 'ALL');
                     _applyFilters();
                   },
                 ),
-                const SizedBox(width: 8),
                 _FilterChip(
                   label: 'Pending',
-                  value: 'PENDING',
-                  current: _statusFilter,
-                  onTap: (v) {
-                    setState(() => _statusFilter = v);
+                  selected: _statusFilter == 'PENDING',
+                  onTap: () {
+                    setState(() => _statusFilter = 'PENDING');
                     _applyFilters();
                   },
                 ),
-                const SizedBox(width: 8),
                 _FilterChip(
                   label: 'Verified',
-                  value: 'VERIFIED',
-                  current: _statusFilter,
-                  onTap: (v) {
-                    setState(() => _statusFilter = v);
+                  selected: _statusFilter == 'VERIFIED',
+                  onTap: () {
+                    setState(() => _statusFilter = 'VERIFIED');
                     _applyFilters();
                   },
                 ),
-                const SizedBox(width: 8),
                 _FilterChip(
                   label: 'Rejected',
-                  value: 'REJECTED',
-                  current: _statusFilter,
-                  onTap: (v) {
-                    setState(() => _statusFilter = v);
+                  selected: _statusFilter == 'REJECTED',
+                  onTap: () {
+                    setState(() => _statusFilter = 'REJECTED');
                     _applyFilters();
                   },
                 ),
@@ -153,68 +161,57 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
             ),
           ),
           if (!_isLoading)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              width: double.infinity,
-              child: Text(
-                '${_filteredPayments.length} payment${_filteredPayments.length == 1 ? '' : 's'}',
-                style: Theme.of(context).textTheme.bodySmall,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 16, 0),
+              child: Row(
+                children: [
+                  Text(
+                    '${_filteredPayments.length} payment${_filteredPayments.length == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.slate500,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
           Expanded(
             child: _isLoading
-                ? _buildShimmer()
-                : _filteredPayments.isEmpty
-                ? _buildEmpty()
-                : RefreshIndicator(
-                    onRefresh: _loadPayments,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: _filteredPayments.length,
-                      itemBuilder: (context, index) =>
-                          _buildPaymentCard(_filteredPayments[index]),
-                    ),
-                  ),
+                ? const Center(child: CircularProgressIndicator())
+                : _buildBody(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildShimmer() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(8),
-      itemCount: 5,
-      itemBuilder: (context, index) {
-        return Card(
-          child: Shimmer.fromColors(
-            baseColor: Colors.grey.shade300,
-            highlightColor: Colors.grey.shade100,
-            child: ListTile(
-              leading: const CircleAvatar(child: SizedBox()),
-              title: Container(height: 16, color: Colors.white),
-              subtitle: Container(height: 12, color: Colors.white),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  Widget _buildBody() {
+    if (_filteredPayments.isEmpty) {
+      return EmptyState(
+        icon: Icons.payments_outlined,
+        title: _searchQuery.isNotEmpty
+            ? 'No payments match your search'
+            : 'No payments yet',
+        subtitle: _searchQuery.isNotEmpty
+            ? 'Try a different search term'
+            : 'Tap the + button to record your first payment',
+        actionLabel: _searchQuery.isEmpty ? 'Record Payment' : null,
+        onAction: _searchQuery.isEmpty
+            ? () => context.push('/payments/create')
+            : null,
+      );
+    }
 
-  Widget _buildEmpty() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.payments_outlined, size: 100, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text(
-            'No payments found',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          const Text('Tap + to record a payment'),
-        ],
+    return RefreshIndicator(
+      onRefresh: _loadPayments,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: _filteredPayments.length,
+        itemBuilder: (context, index) {
+          final p = _filteredPayments[index] as Map<String, dynamic>;
+          return _buildPaymentCard(p);
+        },
       ),
     );
   }
@@ -222,119 +219,148 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
   Widget _buildPaymentCard(Map<String, dynamic> payment) {
     final status = payment['verificationStatus'] as String;
     final color = status == 'VERIFIED'
-        ? Colors.green
-        : (status == 'REJECTED' ? Colors.red : Colors.orange);
-    return Card(
-      child: InkWell(
-        onTap: () {
-          context.push('/payments/${payment['id']}');
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
+        ? AppTheme.successColor
+        : status == 'REJECTED'
+        ? AppTheme.dangerColor
+        : AppTheme.warningColor;
+    final icon = status == 'VERIFIED'
+        ? Icons.verified
+        : status == 'REJECTED'
+        ? Icons.cancel
+        : Icons.hourglass_top;
+
+    final customerName = payment['customerName'] as String? ?? 'Unknown';
+    final amount = (payment['amount'] as num?) ?? 0;
+    final method = payment['paymentMethod'] as String? ?? 'CASH';
+    final invoiceNum = payment['salesOrderNumber'] as String?;
+    final refNum = payment['referenceNumber'] as String?;
+    final dateStr = payment['paymentDate'] as String?;
+    final dateLabel = dateStr != null
+        ? DateFormat('MMM dd, HH:mm').format(DateTime.parse(dateStr).toLocal())
+        : '';
+
+    final isAdmin = ref.read(authNotifierProvider).user?.isAdmin ?? false;
+
+    final badges = <Widget>[
+      StatusBadge(label: status, color: color, icon: icon),
+      StatusBadge(
+        label: _methodLabel(method),
+        color: AppTheme.slate600,
+        icon: _methodIcon(method),
+      ),
+    ];
+
+    final meta = <Widget>[
+      MetaItem(icon: Icons.person_outline, label: customerName),
+      if (dateLabel.isNotEmpty)
+        MetaItem(icon: Icons.access_time, label: dateLabel),
+      if (invoiceNum != null)
+        MetaItem(icon: Icons.receipt_long, label: invoiceNum),
+    ];
+
+    final menuItems = <PopupMenuEntry<String>>[
+      const PopupMenuItem<String>(
+        value: 'view',
+        child: Row(
+          children: [
+            Icon(Icons.visibility, size: 18, color: AppTheme.slate700),
+            SizedBox(width: 8),
+            Text('View details'),
+          ],
+        ),
+      ),
+      if (status != 'VERIFIED' && isAdmin)
+        const PopupMenuItem<String>(
+          value: 'delete',
           child: Row(
             children: [
-              CircleAvatar(
-                backgroundColor: color.withValues(alpha: 0.1),
-                child: Icon(Icons.payments, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      payment['customerName'] as String,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${DateFormat('MMM dd, yyyy').format(DateTime.parse(payment['paymentDate'] as String))} • ${payment['paymentMethod']}',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                    if (payment['referenceNumber'] != null)
-                      Text(
-                        'Ref: ${payment['referenceNumber']}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'ETB ${(payment['amount'] as num).toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      status,
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: color,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (ref.read(authNotifierProvider).user?.isAdmin ?? false)
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (v) {
-                    if (v == 'delete') {
-                      _deletePayment(payment);
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    if (status != 'VERIFIED')
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    if (status == 'VERIFIED')
-                      const PopupMenuItem(
-                        enabled: false,
-                        child: Row(
-                          children: [
-                            Icon(Icons.lock, size: 18, color: Colors.grey),
-                            SizedBox(width: 8),
-                            Text(
-                              'Verified (cannot delete)',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
+              Icon(Icons.delete_outline, size: 18, color: AppTheme.dangerColor),
+              SizedBox(width: 8),
+              Text('Delete', style: TextStyle(color: AppTheme.dangerColor)),
             ],
           ),
         ),
+      if (status == 'VERIFIED')
+        const PopupMenuItem<String>(
+          enabled: false,
+          child: Row(
+            children: [
+              Icon(Icons.lock_outline, size: 18, color: AppTheme.slate400),
+              SizedBox(width: 8),
+              Text(
+                'Verified (cannot delete)',
+                style: TextStyle(color: AppTheme.slate400),
+              ),
+            ],
+          ),
+        ),
+    ];
+
+    return DataCard(
+      leading: CircleAvatar(
+        backgroundColor: color.withValues(alpha: 0.12),
+        child: Icon(Icons.payments, color: color, size: 20),
       ),
+      title: refNum != null && refNum.isNotEmpty
+          ? refNum
+          : '#${(payment['id'] as String).substring(0, 8)}',
+      subtitle: customerName,
+      meta: meta,
+      badges: badges,
+      trailing: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'ETB ${NumberFormat.decimalPattern().format(amount)}',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              color: AppTheme.slate900,
+            ),
+          ),
+        ],
+      ),
+      onTap: () => context.push('/payments/${payment['id']}'),
+      menuBuilder: () => menuItems,
+      onMenuSelected: (v) {
+        if (v == 'view') {
+          context.push('/payments/${payment['id']}');
+        } else if (v == 'delete') {
+          _deletePayment(payment);
+        }
+      },
     );
+  }
+
+  IconData _methodIcon(String m) {
+    switch (m) {
+      case 'CASH':
+        return Icons.payments;
+      case 'BANK_TRANSFER':
+        return Icons.account_balance;
+      case 'MOBILE_MONEY':
+        return Icons.phone_android;
+      case 'CHECK':
+        return Icons.note_alt_outlined;
+      default:
+        return Icons.more_horiz;
+    }
+  }
+
+  String _methodLabel(String m) {
+    switch (m) {
+      case 'CASH':
+        return 'CASH';
+      case 'BANK_TRANSFER':
+        return 'BANK';
+      case 'MOBILE_MONEY':
+        return 'MOBILE';
+      case 'CHECK':
+        return 'CHECK';
+      default:
+        return m;
+    }
   }
 
   Future<void> _deletePayment(Map<String, dynamic> payment) async {
@@ -351,12 +377,34 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
       final api = ref.read(apiClientProvider);
       await api.delete('/payments/${payment['id']}');
       if (mounted) {
-        showAppSnackBar(context, message: 'Payment deleted', isSuccess: true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Text('Payment deleted'),
+              ],
+            ),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
       }
       _loadPayments();
     } catch (e) {
       if (mounted) {
-        showAppSnackBar(context, message: parseApiError(e), isError: true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Text(parseApiError(e))),
+              ],
+            ),
+            backgroundColor: AppTheme.dangerColor,
+          ),
+        );
       }
     }
   }
@@ -364,25 +412,35 @@ class _PaymentsListScreenState extends ConsumerState<PaymentsListScreen> {
 
 class _FilterChip extends StatelessWidget {
   final String label;
-  final String value;
-  final String current;
-  final Function(String) onTap;
+  final bool selected;
+  final VoidCallback onTap;
+
   const _FilterChip({
     required this.label,
-    required this.value,
-    required this.current,
+    required this.selected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isActive = current == value;
-    return FilterChip(
-      label: Text(label),
-      selected: isActive,
-      onSelected: (_) => onTap(value),
-      selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
-      checkmarkColor: AppTheme.primaryColor,
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+        checkmarkColor: AppTheme.primaryColor,
+        labelStyle: TextStyle(
+          color: selected ? AppTheme.primaryColor : AppTheme.slate500,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        ),
+        side: BorderSide(
+          color: selected
+              ? AppTheme.primaryColor.withValues(alpha: 0.3)
+              : AppTheme.slate200,
+        ),
+      ),
     );
   }
 }

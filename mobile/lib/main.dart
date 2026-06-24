@@ -1,4 +1,6 @@
+import 'package:artemis_business_os/core/i18n/locale_provider.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/widgets/app_logo.dart';
 import 'package:artemis_business_os/core/widgets/main_shell.dart';
 import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
 import 'package:artemis_business_os/features/auth/presentation/screens/login_screen.dart';
@@ -24,6 +26,7 @@ import 'package:artemis_business_os/features/products/presentation/screens/produ
 import 'package:artemis_business_os/features/reports/presentation/screens/reports_screen.dart';
 import 'package:artemis_business_os/features/sales/presentation/screens/create_sales_order_screen.dart';
 import 'package:artemis_business_os/features/sales/presentation/screens/sales_list_screen.dart';
+import 'package:artemis_business_os/features/settings/presentation/screens/settings_screen.dart';
 import 'package:artemis_business_os/features/users/presentation/screens/create_user_screen.dart';
 import 'package:artemis_business_os/features/users/presentation/screens/edit_user_screen.dart';
 import 'package:artemis_business_os/features/users/presentation/screens/users_list_screen.dart';
@@ -217,6 +220,10 @@ final _routerProvider = Provider<GoRouter>((ref) {
           return EditBomScreen(bomId: id);
         },
       ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
     ],
   );
 });
@@ -228,12 +235,20 @@ class ArtemisApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authNotifierProvider);
     final router = ref.watch(_routerProvider);
+    final locale = ref.watch(localeProvider);
 
     return MaterialApp.router(
       title: 'Artemis Business OS',
       theme: AppTheme.lightTheme(),
       debugShowCheckedModeBanner: false,
       routerConfig: router,
+      locale: locale.materialLocale,
+      supportedLocales: AppLocale.values.map((l) => l.materialLocale).toList(),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        DefaultMaterialLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+      ],
       builder: (context, child) {
         if (!authState.initialized) {
           return const _SplashScreen();
@@ -249,6 +264,55 @@ class _SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppGradients.headerBar),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: const Center(child: AppLogo(size: 64)),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Artemis',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'BUSINESS OS',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 3.2,
+                ),
+              ),
+              const SizedBox(height: 36),
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
