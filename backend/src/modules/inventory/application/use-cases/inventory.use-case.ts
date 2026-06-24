@@ -45,6 +45,32 @@ export class InventoryUseCase {
     return this.enrichAndMap(items);
   }
 
+  /**
+   * Create an inventory record for a product. Idempotent — returns the
+   * existing record if one already exists for the product.
+   */
+  async createOrGetItem(
+    productId: string,
+    initialQuantity: number,
+  ): Promise<InventoryItemResponseDto> {
+    const existing = await this.prisma.inventoryItem.findFirst({
+      where: { productId },
+    });
+    if (existing) {
+      return (await this.enrichAndMap([existing]))[0];
+    }
+    const created = await this.prisma.inventoryItem.create({
+      data: {
+        productId,
+        currentQuantity: initialQuantity,
+        availableQuantity: initialQuantity,
+        averageCost: 0,
+        lastPurchaseCost: 0,
+      },
+    });
+    return (await this.enrichAndMap([created]))[0];
+  }
+
   private async enrichAndMap(
     items: Array<{
       id: string;
