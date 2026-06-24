@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
+  "name": "artemis-business-os",
+  "pages_build_output_dir": "mobile/build/web",
+  "build": {
+    "command": "cd mobile && flutter build web --release --dart-define=API_BASE_URL=/api/v1 --no-tree-shake-icons",
+    "cwd": ".",
+    "watch_dir": "mobile/lib"
+  },
+  "env": {
+    "API_BASE_URL": "/api/v1"
+  }
+}
