@@ -2,12 +2,11 @@ import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
 import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
-import 'package:artemis_business_os/core/widgets/main_shell.dart';
-import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
+import 'package:artemis_business_os/core/widgets/ui_pro.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shimmer/shimmer.dart';
+import 'package:intl/intl.dart';
 
 class CustomerListScreen extends ConsumerStatefulWidget {
   const CustomerListScreen({super.key});
@@ -21,13 +20,19 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
   List<dynamic> _filteredCustomers = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String _filter = 'ALL'; // ALL, WITH_BALANCE, ACTIVE
-  String _sortBy = 'NAME'; // NAME, BALANCE, BALANCE_DESC
+  String _filter = 'ALL';
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadCustomers();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCustomers() async {
@@ -45,12 +50,30 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
     }
   }
 
+  void _applyFilters() {
+    var filtered = List<dynamic>.from(_allCustomers);
+    if (_filter == 'OWES') {
+      filtered = filtered
+          .where((c) => ((c['outstandingBalance'] as num?) ?? 0) > 0)
+          .toList();
+    }
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      filtered = filtered.where((c) {
+        return (c['name'] as String).toLowerCase().contains(q) ||
+            (c['phone'] as String? ?? '').toLowerCase().contains(q) ||
+            (c['email'] as String? ?? '').toLowerCase().contains(q);
+      }).toList();
+    }
+    setState(() => _filteredCustomers = filtered);
+  }
+
   Future<void> _deleteCustomer(Map<String, dynamic> customer) async {
     final confirmed = await ConfirmDialog.show(
       context,
       title: 'Delete Customer?',
       message:
-          'Are you sure you want to delete "${customer['name']}"? This cannot be undone. Any unpaid sales will block the delete.',
+          'Are you sure you want to delete "${customer['name']}"? This cannot be undone.',
       confirmLabel: 'Delete',
       type: ConfirmDialogType.destructive,
     );
@@ -69,433 +92,491 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
     }
   }
 
-  void _applyFilters() {
-    var filtered = List<dynamic>.from(_allCustomers);
-
-    // Search
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered = filtered.where((c) {
-        return (c['name'] as String).toLowerCase().contains(query) ||
-            (c['phoneNumber'] as String).toLowerCase().contains(query) ||
-            (c['city'] as String).toLowerCase().contains(query);
-      }).toList();
-    }
-
-    // Filter
-    if (_filter == 'WITH_BALANCE') {
-      filtered = filtered
-          .where((c) => (c['outstandingBalance'] as num) > 0)
-          .toList();
-    } else if (_filter == 'ACTIVE') {
-      filtered = filtered.where((c) => c['accountStatus'] == 'ACTIVE').toList();
-    }
-
-    // Sort
-    if (_sortBy == 'NAME') {
-      filtered.sort(
-        (a, b) => (a['name'] as String).compareTo(b['name'] as String),
-      );
-    } else if (_sortBy == 'BALANCE_DESC') {
-      filtered.sort(
-        (a, b) => (b['outstandingBalance'] as num).compareTo(
-          a['outstandingBalance'] as num,
-        ),
-      );
-    }
-
-    setState(() {
-      _filteredCustomers = filtered;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final totalReceivables = _allCustomers.fold<double>(
+      0,
+      (sum, c) => sum + ((c['outstandingBalance'] as num?) ?? 0).toDouble(),
+    );
+    final owesCount = _allCustomers
+        .where((c) => ((c['outstandingBalance'] as num?) ?? 0) > 0)
+        .length;
+
     return Scaffold(
-      appBar: BrandedAppBar(
-        title: 'Customers',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadCustomers,
-            tooltip: 'Refresh',
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_rounded),
-            onPressed: () => context.push('/settings'),
-            tooltip: 'Settings',
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final created = await context.push<bool>('/customers/create');
-          if (created == true) {
-            _loadCustomers();
-          }
-        },
-        icon: const Icon(Icons.person_add),
-        label: const Text('Add Customer'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-      ),
-      body: Column(
-        children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search by name, phone, or city...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() => _searchQuery = '');
-                          _applyFilters();
-                        },
-                      )
-                    : null,
-              ),
-              onChanged: (value) {
-                setState(() => _searchQuery = value);
-                _applyFilters();
-              },
-            ),
-          ),
-          // Filter chips
-          SizedBox(
-            height: 50,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _FilterChip(
-                  label: 'All',
-                  value: 'ALL',
-                  current: _filter,
-                  onTap: (v) {
-                    setState(() => _filter = v);
-                    _applyFilters();
-                  },
+      backgroundColor: AppTheme.slate50,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, _) => [
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 180,
+            backgroundColor: AppTheme.infoColor,
+            iconTheme: const IconThemeData(color: Colors.white),
+            flexibleSpace: FlexibleSpaceBar(
+              background: HeroHeader(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0284C7), Color(0xFF22D3EE)],
                 ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'With Balance',
-                  value: 'WITH_BALANCE',
-                  current: _filter,
-                  onTap: (v) {
-                    setState(() => _filter = v);
-                    _applyFilters();
-                  },
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Active',
-                  value: 'ACTIVE',
-                  current: _filter,
-                  onTap: (v) {
-                    setState(() => _filter = v);
-                    _applyFilters();
-                  },
-                ),
-                const SizedBox(width: 8),
-                _SortChip(
-                  label: 'Sort: Name',
-                  value: 'NAME',
-                  current: _sortBy,
-                  onTap: (v) {
-                    setState(() => _sortBy = v);
-                    _applyFilters();
-                  },
-                ),
-                const SizedBox(width: 8),
-                _SortChip(
-                  label: 'Sort: Highest Debt',
-                  value: 'BALANCE_DESC',
-                  current: _sortBy,
-                  onTap: (v) {
-                    setState(() => _sortBy = v);
-                    _applyFilters();
-                  },
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          // Results count
-          if (!_isLoading)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              width: double.infinity,
-              child: Text(
-                '${_filteredCustomers.length} customer${_filteredCustomers.length == 1 ? '' : 's'}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-          // List
-          Expanded(
-            child: _isLoading
-                ? _buildShimmerLoading()
-                : _filteredCustomers.isEmpty
-                ? _buildEmptyState()
-                : RefreshIndicator(
-                    onRefresh: _loadCustomers,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: _filteredCustomers.length,
-                      itemBuilder: (context, index) {
-                        final customer =
-                            _filteredCustomers[index] as Map<String, dynamic>;
-                        return _buildCustomerCard(customer);
-                      },
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShimmerLoading() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(8),
-      itemCount: 5,
-      itemBuilder: (context, index) {
-        return Card(
-          child: Shimmer.fromColors(
-            baseColor: Colors.grey.shade300,
-            highlightColor: Colors.grey.shade100,
-            child: ListTile(
-              leading: const CircleAvatar(child: SizedBox()),
-              title: Container(height: 16, color: Colors.white),
-              subtitle: Container(height: 12, color: Colors.white),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.people_outline, size: 100, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text(
-            _searchQuery.isNotEmpty ? 'No customers found' : 'No customers yet',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _searchQuery.isNotEmpty
-                ? 'Try adjusting your search or filters'
-                : 'Tap + to add your first customer',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCustomerCard(Map<String, dynamic> customer) {
-    final balance = customer['outstandingBalance'] as num;
-    final hasBalance = balance > 0;
-    final isAdmin = ref.read(authNotifierProvider).user?.isAdmin ?? false;
-
-    return Card(
-      child: InkWell(
-        onTap: () {
-          context.push('/customers/${customer['id']}');
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: hasBalance
-                    ? Colors.red.shade100
-                    : Colors.green.shade100,
-                child: Text(
-                  (customer['name'] as String).substring(0, 1).toUpperCase(),
-                  style: TextStyle(
-                    color: hasBalance ? Colors.red : Colors.green,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
+                height: 180,
+                glow: true,
+                padding: const EdgeInsets.fromLTRB(20, 64, 20, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      customer['name'] as String,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${customer['city']} • ${customer['phoneNumber']}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 4),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: customer['accountStatus'] == 'ACTIVE'
-                                ? Colors.green.shade50
-                                : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            customer['accountStatus'] as String,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: customer['accountStatus'] == 'ACTIVE'
-                                  ? Colors.green
-                                  : Colors.grey,
-                            ),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Customers',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Your customer base',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Receivables',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            Text(
+                              'ETB ${NumberFormat.compactCurrency(symbol: '', decimalDigits: 0).format(totalReceivables)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _MiniStat(
+                          icon: Icons.people_rounded,
+                          label: 'Total',
+                          value: '${_allCustomers.length}',
+                        ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Credit: ETB ${(customer['creditLimit'] as num).toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey,
-                          ),
+                        _MiniStat(
+                          icon: Icons.account_balance_wallet_rounded,
+                          label: 'Owes',
+                          value: '$owesCount',
+                          highlight: owesCount > 0,
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
+            ),
+          ),
+        ],
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by name, phone, or email...',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                            _applyFilters();
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (v) {
+                  setState(() => _searchQuery = v);
+                  _applyFilters();
+                },
+              ),
+            ),
+            SizedBox(
+              height: 40,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  Text(
-                    hasBalance ? 'OWES' : 'CLEAR',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: hasBalance ? Colors.red : Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  _ProChip(
+                    label: 'All',
+                    selected: _filter == 'ALL',
+                    onTap: () {
+                      setState(() => _filter = 'ALL');
+                      _applyFilters();
+                    },
                   ),
-                  Text(
-                    'ETB ${balance.toStringAsFixed(0)}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: hasBalance ? Colors.red : Colors.green,
-                    ),
+                  _ProChip(
+                    label: 'With Balance',
+                    selected: _filter == 'OWES',
+                    color: AppTheme.warningColor,
+                    onTap: () {
+                      setState(() => _filter = 'OWES');
+                      _applyFilters();
+                    },
                   ),
                 ],
               ),
-              if (isAdmin)
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (v) {
-                    if (v == 'edit') {
-                      context.push('/customers/${customer['id']}/edit');
-                    } else if (v == 'delete') {
-                      _deleteCustomer(customer);
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 18),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
+            ),
+            const SizedBox(height: 4),
+            Expanded(child: _buildBody()),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await context.push('/customers/new');
+          _loadCustomers();
+        },
+        backgroundColor: AppTheme.infoColor,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.person_add_rounded),
+        label: const Text('New Customer'),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: 5,
+        itemBuilder: (context, i) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: GlassCard(
+            child: Row(
+              children: const [
+                Skeleton(height: 44, width: 44, radius: 22, circle: true),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton(width: 120, height: 14),
+                      SizedBox(height: 6),
+                      Skeleton(width: 180, height: 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    if (_filteredCustomers.isEmpty) {
+      return EmptyStatePro(
+        icon: Icons.people_outline_rounded,
+        title: _searchQuery.isNotEmpty ? 'No matches' : 'No customers yet',
+        subtitle: _searchQuery.isNotEmpty
+            ? 'Try a different search term'
+            : 'Tap + to add your first customer',
+        accentColor: AppTheme.infoColor,
+      );
+    }
+    return RefreshIndicator(
+      color: AppTheme.infoColor,
+      onRefresh: _loadCustomers,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: _filteredCustomers.length,
+        itemBuilder: (context, i) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _buildCustomerCard(_filteredCustomers[i]),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomerCard(Map<String, dynamic> customer) {
+    final balance = (customer['outstandingBalance'] as num? ?? 0).toDouble();
+    final owes = balance > 0;
+    final credit = balance < 0;
+    final name = customer['name'] as String? ?? 'Unknown';
+    final phone = customer['phone'] as String?;
+    final city = customer['city'] as String?;
+    final region = customer['region'] as String?;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    Color color;
+    String accentLabel;
+    if (owes) {
+      color = AppTheme.warningColor;
+      accentLabel = 'OWES';
+    } else if (credit) {
+      color = AppTheme.successColor;
+      accentLabel = 'CREDIT';
+    } else {
+      color = AppTheme.infoColor;
+      accentLabel = 'CLEAR';
+    }
+
+    return GlassCard(
+      accentColor: color,
+      onTap: () => context.push('/customers/${customer['id']}'),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  color.withValues(alpha: 0.2),
+                  color.withValues(alpha: 0.08),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              initial,
+              style: TextStyle(
+                color: color,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.slate900,
+                          letterSpacing: -0.1,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 18, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
+                    if (owes || credit)
+                      StatusPill(label: accentLabel, color: color, small: true),
                   ],
                 ),
-            ],
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (phone != null && phone.isNotEmpty) ...[
+                      Icon(
+                        Icons.phone_rounded,
+                        size: 11,
+                        color: AppTheme.slate400,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        phone,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.slate500,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (city != null && city.isNotEmpty)
+                      Flexible(
+                        child: Text(
+                          '$city',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.slate500,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
+          if (owes || credit)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'ETB',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: AppTheme.slate500,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  NumberFormat.decimalPattern().format(balance.abs()),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool highlight;
+
+  const _MiniStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: highlight ? 0.25 : 0.15),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _FilterChip extends StatelessWidget {
+class _ProChip extends StatelessWidget {
   final String label;
-  final String value;
-  final String current;
-  final Function(String) onTap;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
 
-  const _FilterChip({
+  const _ProChip({
     required this.label,
-    required this.value,
-    required this.current,
+    required this.selected,
     required this.onTap,
+    this.color = AppTheme.primaryColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isActive = current == value;
-    return FilterChip(
-      label: Text(label),
-      selected: isActive,
-      onSelected: (_) => onTap(value),
-      selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
-      checkmarkColor: AppTheme.primaryColor,
-    );
-  }
-}
-
-class _SortChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final String current;
-  final Function(String) onTap;
-
-  const _SortChip({
-    required this.label,
-    required this.value,
-    required this.current,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = current == value;
-    return Chip(
-      label: Text(label),
-      backgroundColor: isActive ? AppTheme.primaryColor : null,
-      labelStyle: TextStyle(
-        color: isActive ? Colors.white : null,
-        fontSize: 12,
+    final c = color;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+        child: AnimatedContainer(
+          duration: AppTheme.durBase,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? c : Colors.white,
+            borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+            border: Border.all(
+              color: selected ? c : AppTheme.slate200,
+              width: 1.2,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: c.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : AppTheme.slate600,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
       ),
-      deleteIcon: const Icon(Icons.swap_vert, size: 16),
-      onDeleted: () => onTap(value),
     );
   }
 }
