@@ -2,6 +2,7 @@ import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
 import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
+import 'package:artemis_business_os/core/widgets/data_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,6 +31,7 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
   bool _isSaving = false;
   String? _error;
   bool _isActive = true;
+  Map<String, dynamic>? _inventoryItem;
 
   @override
   void initState() {
@@ -57,6 +59,7 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
       final results = await Future.wait<dynamic>([
         api.get('/products/${widget.productId}'),
         api.get('/products/categories'),
+        api.get('/inventory'),
       ]);
       final p = results[0].data as Map<String, dynamic>;
       _nameController.text = p['name'] as String? ?? '';
@@ -66,6 +69,14 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
       _reorderController.text =
           (p['reorderPoint'] as num?)?.toStringAsFixed(0) ?? '0';
       _isActive = p['isActive'] as bool? ?? true;
+      final inventory = (results[2].data as List<dynamic>);
+      Map<String, dynamic>? invItem;
+      for (final item in inventory) {
+        if ((item as Map<String, dynamic>)['productId'] == widget.productId) {
+          invItem = item;
+          break;
+        }
+      }
       setState(() {
         _categories = results[1].data as List<dynamic>;
         _isLoading = false;
@@ -75,6 +86,7 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
               ? _categories.first as Map<String, dynamic>
               : null,
         );
+        _inventoryItem = invItem;
       });
     } catch (e) {
       setState(() {
@@ -119,6 +131,69 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _createInitialStock() async {
+    final qtyController = TextEditingController();
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Set Initial Stock'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'How many units do you currently have on hand?',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: qtyController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(labelText: 'Initial quantity'),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final q = double.tryParse(qtyController.text);
+              if (q != null && q >= 0) Navigator.pop(ctx, q);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    qtyController.dispose();
+    if (result == null) return;
+
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.post(
+        '/inventory',
+        data: {'productId': widget.productId, 'initialQuantity': result},
+      );
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: 'Initial stock set to ${result.toStringAsFixed(0)}',
+          isSuccess: true,
+        );
+        _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, message: parseApiError(e), isError: true);
+      }
     }
   }
 
@@ -297,6 +372,8 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
               ),
             ),
             const SizedBox(height: 24),
+            _buildInventorySection(),
+            const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: _isSaving ? null : _save,
               icon: _isSaving
@@ -322,6 +399,157 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInventorySection() {
+    final inv = _inventoryItem;
+    final qty = inv != null
+        ? ((inv['currentQuantity'] as num?) ?? 0).toDouble()
+        : 0.0;
+    final unit = _unitController.text.isEmpty ? 'units' : _unitController.text;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: inv != null
+            ? AppTheme.primaryLight.withValues(alpha: 0.4)
+            : AppTheme.warningLight,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(
+          color: inv != null
+              ? AppTheme.primaryColor.withValues(alpha: 0.3)
+              : AppTheme.warningColor.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                inv != null
+                    ? Icons.inventory_2_rounded
+                    : Icons.warning_amber_rounded,
+                color: inv != null
+                    ? AppTheme.primaryColor
+                    : AppTheme.warningColor,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Inventory',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.slate900,
+                ),
+              ),
+              const Spacer(),
+              StatusBadge(
+                label: inv != null ? 'TRACKED' : 'NOT TRACKED',
+                color: inv != null
+                    ? AppTheme.successColor
+                    : AppTheme.warningColor,
+                icon: inv != null ? Icons.check_circle : Icons.help_outline,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (inv != null)
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Current Stock',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.slate500,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${qty.toStringAsFixed(0)} $unit',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.slate900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Value',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.slate500,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'ETB ${(inv['inventoryValue'] as num? ?? 0).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.slate900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          else
+            const Text(
+              'No inventory record exists for this product. Sales and production will fail without one.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.slate700,
+                height: 1.4,
+              ),
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                if (inv != null) {
+                  context.push('/inventory/${inv['id']}');
+                } else {
+                  _createInitialStock();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: inv != null
+                    ? AppTheme.primaryColor
+                    : AppTheme.warningColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                ),
+              ),
+              icon: Icon(
+                inv != null ? Icons.tune_rounded : Icons.add_circle_outline,
+                size: 18,
+              ),
+              label: Text(
+                inv != null ? 'Adjust Stock' : 'Set Initial Stock',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

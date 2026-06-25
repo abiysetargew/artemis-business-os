@@ -1,0 +1,57 @@
+👋 Artemis Business OS — Testing Time! 🚀
+
+Production is live. Please test the new features and report back.
+
+🔗 **App URL:** https://artemis-backend-z0e6.onrender.com/
+🔑 **Login:** admin@artemis.com / admin123
+
+⚠️ First load may take ~30 seconds (Render free tier wakes up). Hard refresh if you see old version: Ctrl+Shift+R (Windows) / Cmd+Shift+R (Mac).
+
+━━━━━━━━━━━━━━━━━━━
+✅ **TEST 1 — New Sale with Regions Combo**
+━━━━━━━━━━━━━━━━━━━
+1. Click **+ New Sale** on dashboard
+2. Pick **Credit Sale**
+3. Customer: *Dire Dawa Beverage Supply*
+4. Type "Fikir" in search → tap **Fikir Gin 1 Liter** to add
+5. Set Qty: 5 | Price: 475
+6. Region: **SNNPR** → City: **Hawassa** ← new combo box!
+7. Save → green toast = ✅
+
+━━━━━━━━━━━━━━━━━━━
+✅ **TEST 2 — Record Payment (NEW Intent System)**
+━━━━━━━━━━━━━━━━━━━
+1. Click **+ Collect** (or **New Payment**)
+2. Customer: *Dire Dawa Beverage Supply*
+3. Invoice dropdown auto-loads → pick the one you just created
+4. Amount auto-fills
+5. Pick **Mobile Money** + Reference: TEST-001
+6. Save → green toast = ✅
+
+Bonus: Try **Advance Payment** intent — no invoice link needed.
+
+━━━━━━━━━━━━━━━━━━━
+✅ **TEST 3 — Switch Language**
+━━━━━━━━━━━━━━━━━━━
+1. Click ⚙️ (top-right) → Settings
+2. Language → **አማርኛ**
+3. Bottom nav: መነሻ / ሽያጭ / ደንበኞች / ክምችት ← should switch
+
+━━━━━━━━━━━━━━━━━━━
+✅ **TEST 4 — Reports**
+━━━━━━━━━━━━━━━━━━━
+Dashboard → Reports → tap each tab (Sales / Payments / Inventory / Production)
+Charts should render. Try the date filter.
+
+━━━━━━━━━━━━━━━━━━━
+🐛 **FOUND A BUG?**
+━━━━━━━━━━━━━━━━━━━
+Send screenshot + these 4 things:
+1. Which test number + step
+2. What you expected
+3. What actually happened
+4. Your phone/browser
+
+Critical bugs → reply here. Cosmetic → batch into one message.
+
+⏰ Please test today. Ping me if anything blocks you.
