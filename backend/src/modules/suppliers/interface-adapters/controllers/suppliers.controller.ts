@@ -12,12 +12,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { SupplierUseCase } from '../application/use-cases/supplier.use-case';
+import { SupplierUseCase } from '../../application/use-cases/supplier.use-case';
 import {
   CreateSupplierDto,
   UpdateSupplierDto,
   SupplierResponseDto,
-} from '../application/dto/supplier.dto';
+} from '../../application/dto/supplier.dto';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator';
 

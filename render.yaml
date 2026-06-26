@@ -6,8 +6,9 @@ services:
     plan: free
     buildCommand: |
       npm install && npx prisma generate && npx nest build && \
-      echo "Flutter web bundle pre-built and committed at mobile/build/web - no install needed" && \
-      ls -la ../mobile/build/web | head -20
+      rm -rf public && mkdir -p public && cp -r ../mobile/build/web/* public/ && \
+      echo "Flutter web bundle copied to public/ from mobile/build/web" && \
+      ls -la public | head -10
     startCommand: npx prisma migrate deploy && node dist/main.js
     autoDeploy: true
     healthCheckPath: /health

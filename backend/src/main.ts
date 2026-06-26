@@ -36,12 +36,23 @@ async function bootstrap() {
 
   // Serve Flutter web build at the root path so a single Render URL hosts
   // the entire application (frontend + API). API remains under /api/v1/*.
-  const webRoot = join(process.cwd(), '..', 'mobile', 'build', 'web');
-  if (existsSync(webRoot)) {
+  // In production (Render), the build copies mobile/build/web into ./public.
+  const candidates = [
+    join(process.cwd(), 'public'),
+    join(process.cwd(), '..', 'mobile', 'build', 'web'),
+  ];
+  let webRoot: string | null = null;
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      webRoot = candidate;
+      break;
+    }
+  }
+  if (webRoot) {
     app.useStaticAssets(webRoot, { prefix: '/' });
     console.log(`[web] Serving Flutter app from ${webRoot}`);
   } else {
-    console.log(`[web] Flutter web build not found at ${webRoot}`);
+    console.log(`[web] Flutter web build not found in any candidate path`);
   }
 
   // Swagger API Documentation
