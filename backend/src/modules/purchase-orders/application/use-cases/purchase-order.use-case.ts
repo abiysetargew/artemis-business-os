@@ -18,7 +18,7 @@ export class PurchaseOrderUseCase {
     supplierId?: string;
     status?: string;
   }): Promise<PurchaseOrderResponseDto[]> {
-    const where: any = { isDeleted: false };
+    const where: any = {};
     if (filters?.supplierId) where.supplierId = filters.supplierId;
     if (filters?.status) where.status = filters.status;
     const orders = await this.prisma.purchaseOrder.findMany({
