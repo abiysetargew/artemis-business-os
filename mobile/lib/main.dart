@@ -28,6 +28,12 @@ import 'package:artemis_business_os/features/sales/presentation/screens/create_s
 import 'package:artemis_business_os/features/sales/presentation/screens/sale_detail_screen.dart';
 import 'package:artemis_business_os/features/sales/presentation/screens/sales_list_screen.dart';
 import 'package:artemis_business_os/features/settings/presentation/screens/settings_screen.dart';
+import 'package:artemis_business_os/features/suppliers/presentation/screens/create_supplier_screen.dart';
+import 'package:artemis_business_os/features/suppliers/presentation/screens/supplier_detail_screen.dart';
+import 'package:artemis_business_os/features/suppliers/presentation/screens/suppliers_list_screen.dart';
+import 'package:artemis_business_os/features/purchase-orders/presentation/screens/create_purchase_order_screen.dart';
+import 'package:artemis_business_os/features/purchase-orders/presentation/screens/purchase_order_detail_screen.dart';
+import 'package:artemis_business_os/features/purchase-orders/presentation/screens/purchase_orders_list_screen.dart';
 import 'package:artemis_business_os/features/users/presentation/screens/create_user_screen.dart';
 import 'package:artemis_business_os/features/users/presentation/screens/edit_user_screen.dart';
 import 'package:artemis_business_os/features/users/presentation/screens/users_list_screen.dart';
@@ -226,6 +232,42 @@ final _routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return EditBomScreen(bomId: id);
+        },
+      ),
+      GoRoute(
+        path: '/suppliers',
+        builder: (context, state) => const SuppliersListScreen(),
+      ),
+      GoRoute(
+        path: '/suppliers/new',
+        builder: (context, state) => const CreateSupplierScreen(),
+      ),
+      GoRoute(
+        path: '/suppliers/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return SupplierDetailScreen(supplierId: id);
+        },
+      ),
+      GoRoute(
+        path: '/purchase-orders',
+        builder: (context, state) {
+          final supplierId = state.uri.queryParameters['supplierId'];
+          return PurchaseOrdersListScreen(supplierIdFilter: supplierId);
+        },
+      ),
+      GoRoute(
+        path: '/purchase-orders/new',
+        builder: (context, state) {
+          final supplierId = state.uri.queryParameters['supplierId'];
+          return CreatePurchaseOrderScreen(supplierId: supplierId);
+        },
+      ),
+      GoRoute(
+        path: '/purchase-orders/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return PurchaseOrderDetailScreen(poId: id);
         },
       ),
       GoRoute(
