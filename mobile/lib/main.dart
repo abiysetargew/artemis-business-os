@@ -24,6 +24,7 @@ import 'package:artemis_business_os/features/products/presentation/screens/edit_
 import 'package:artemis_business_os/features/products/presentation/screens/products_list_screen.dart';
 import 'package:artemis_business_os/features/reports/presentation/screens/reports_screen.dart';
 import 'package:artemis_business_os/features/sales/presentation/screens/create_sales_order_screen.dart';
+import 'package:artemis_business_os/features/sales/presentation/screens/sale_detail_screen.dart';
 import 'package:artemis_business_os/features/sales/presentation/screens/sales_list_screen.dart';
 import 'package:artemis_business_os/features/settings/presentation/screens/settings_screen.dart';
 import 'package:artemis_business_os/features/users/presentation/screens/create_user_screen.dart';
@@ -114,6 +115,13 @@ final _routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/sales/create',
         builder: (context, state) => const CreateSalesOrderScreen(),
+      ),
+      GoRoute(
+        path: '/sales/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return SaleDetailScreen(saleId: id);
+        },
       ),
       GoRoute(
         path: '/customers/:id',
