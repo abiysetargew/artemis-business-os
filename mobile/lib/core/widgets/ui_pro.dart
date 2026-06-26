@@ -1151,7 +1151,7 @@ class HeroHeader extends StatelessWidget {
   const HeroHeader({
     super.key,
     required this.child,
-    this.gradient = AppTheme.gradientHeader,
+    this.gradient = AppTheme.gradientAurora,
     this.height = 180,
     this.padding = const EdgeInsets.fromLTRB(20, 24, 20, 24),
     this.glow = true,
