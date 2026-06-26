@@ -18,6 +18,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { HealthModule } from './modules/health/health.module';
 import { LocationsModule } from './common/locations.module';
+import { SuppliersModule } from './modules/suppliers/suppliers.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { LocationsModule } from './common/locations.module';
     ReportsModule,
     HealthModule,
     LocationsModule,
+    SuppliersModule,
   ],
   providers: [
     {

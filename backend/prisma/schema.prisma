@@ -89,6 +89,7 @@ model User {
   receiptVerifications  ReceiptVerification[]
   auditLogs             AuditLog[]
   refreshTokens         RefreshToken[]
+  purchaseOrders        PurchaseOrder[]
 
   @@map("users")
 }
@@ -123,6 +124,7 @@ model Product {
   billOfMaterialItems   BillOfMaterialItem[] @relation("MaterialProduct")
   productionBatches     ProductionBatch[]
   salesOrderItems       SalesOrderItem[]
+  purchaseOrderItems    PurchaseOrderItem[]
 
   @@map("products")
 }
@@ -363,6 +365,74 @@ model AuditLog {
   @@map("audit_logs")
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Supplier {
+  id            String   @id @default(uuid()) @map("id")
+  name          String   @map("name")
+  contactName   String?  @map("contact_name")
+  phone         String?
+  email         String?
+  address       String?
+  city          String?
+  region        String?
+  tinNumber     String?  @map("tin_number")
+  notes         String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id              String              @id @default(uuid()) @map("id")
+  poNumber        String              @unique @map("po_number")
+  supplierId      String              @map("supplier_id")
+  orderDate       DateTime            @default(now()) @map("order_date") @db.Timestamptz
+  expectedDate    DateTime?           @map("expected_date") @db.Date
+  receivedDate    DateTime?           @map("received_date") @db.Timestamptz
+  status          PurchaseOrderStatus @default(DRAFT)
+  subtotal        Decimal             @default(0) @db.Decimal(18, 4)
+  tax             Decimal             @default(0) @db.Decimal(18, 4)
+  total           Decimal             @default(0) @db.Decimal(18, 4)
+  notes           String?
+  userId          String              @map("user_id")
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  user     User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items    PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid()) @map("id")
+  purchaseOrderId String        @map("purchase_order_id")
+  productId       String        @map("product_id")
+  quantity        Decimal       @db.Decimal(18, 4)
+  unitCost        Decimal       @db.Decimal(18, 4) @map("unit_cost")
+  receivedQty     Decimal       @default(0) @map("received_qty") @db.Decimal(18, 4)
+  itemTotal       Decimal       @db.Decimal(18, 4) @map("item_total")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([purchaseOrderId, productId])
+  @@map("purchase_order_items")
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
 }
 
 model RefreshToken {
