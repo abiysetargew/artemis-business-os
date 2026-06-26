@@ -1,4 +1,3 @@
-import 'package:artemis_business_os/core/i18n/locale_provider.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
 import 'package:artemis_business_os/core/widgets/app_logo.dart';
 import 'package:artemis_business_os/core/widgets/main_shell.dart';
@@ -12,8 +11,6 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final s = AppStrings.of(context);
-    final locale = ref.watch(localeProvider);
     final auth = ref.watch(authNotifierProvider);
 
     return Scaffold(
@@ -21,64 +18,16 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          _ProfileHeader(user: auth.user, locale: locale),
+          _ProfileHeader(user: auth.user),
           const SizedBox(height: 8),
-          _SectionLabel(label: 'Appearance'),
-          _SettingsCard(
-            children: [
-              _Tile(
-                icon: Icons.language_rounded,
-                iconColor: AppTheme.primaryColor,
-                iconBg: AppTheme.primaryLight,
-                title: 'Language',
-                subtitle: locale.displayName,
-                trailing: PopupMenuButton<AppLocale>(
-                  icon: const Icon(
-                    Icons.expand_more_rounded,
-                    color: AppTheme.slate500,
-                  ),
-                  onSelected: (v) =>
-                      ref.read(localeProvider.notifier).setLocale(v),
-                  itemBuilder: (_) => AppLocale.values
-                      .map(
-                        (l) => PopupMenuItem<AppLocale>(
-                          value: l,
-                          child: Row(
-                            children: [
-                              Text(
-                                l.nativeFlag,
-                                style: const TextStyle(fontSize: 18),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                l.displayName,
-                                style: TextStyle(
-                                  fontWeight: l == locale
-                                      ? FontWeight.w800
-                                      : FontWeight.w500,
-                                  color: l == locale
-                                      ? AppTheme.primaryColor
-                                      : AppTheme.slate900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _SectionLabel(label: s.headingReports),
+          _SectionLabel(label: 'Reports'),
           _SettingsCard(
             children: [
               _Tile(
                 icon: Icons.insights_rounded,
                 iconColor: AppTheme.accentColor,
                 iconBg: AppTheme.accentColor.withValues(alpha: 0.12),
-                title: s.headingReports,
+                title: 'Reports & Analytics',
                 subtitle: 'Sales, payments, inventory & production',
                 onTap: () => context.push('/reports'),
               ),
@@ -138,7 +87,7 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  'v1.0.0',
+                  'v1.1.0',
                   style: TextStyle(fontSize: 11, color: AppTheme.slate500),
                 ),
               ],
@@ -153,8 +102,7 @@ class SettingsScreen extends ConsumerWidget {
 
 class _ProfileHeader extends StatelessWidget {
   final dynamic user;
-  final AppLocale locale;
-  const _ProfileHeader({required this.user, required this.locale});
+  const _ProfileHeader({required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -370,7 +318,7 @@ class _Tile extends StatelessWidget {
                 ],
               ),
             ),
-            if (trailing != null) trailing!,
+            ?trailing,
             if (onTap != null && trailing == null) ...[
               const Icon(
                 Icons.chevron_right_rounded,

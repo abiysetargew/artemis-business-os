@@ -1,4 +1,3 @@
-import 'package:artemis_business_os/core/i18n/locale_provider.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
 import 'package:artemis_business_os/core/widgets/app_logo.dart';
 import 'package:flutter/material.dart';
@@ -13,8 +12,6 @@ class MainShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final s = AppStrings.of(context);
-
     return Scaffold(
       body: child,
       bottomNavigationBar: Container(
@@ -32,26 +29,26 @@ class MainShell extends ConsumerWidget {
             elevation: 0,
             height: 72,
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            destinations: [
+            destinations: const [
               _Dest(
                 icon: AppIcons.dashboard,
                 selectedIcon: Icons.dashboard_rounded,
-                label: s.navHome,
+                label: 'Home',
               ),
               _Dest(
                 icon: Icons.point_of_sale_outlined,
                 selectedIcon: AppIcons.sales,
-                label: s.navSales,
+                label: 'Sales',
               ),
               _Dest(
                 icon: Icons.people_outline,
                 selectedIcon: AppIcons.customers,
-                label: s.navCustomers,
+                label: 'Customers',
               ),
               _Dest(
                 icon: Icons.inventory_2_outlined,
                 selectedIcon: AppIcons.inventory,
-                label: s.navInventory,
+                label: 'Inventory',
               ),
             ],
           ),

@@ -1,4 +1,3 @@
-import 'package:artemis_business_os/core/i18n/locale_provider.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
 import 'package:artemis_business_os/core/widgets/app_logo.dart';
 import 'package:artemis_business_os/core/widgets/main_shell.dart';
@@ -235,20 +234,12 @@ class ArtemisApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authNotifierProvider);
     final router = ref.watch(_routerProvider);
-    final locale = ref.watch(localeProvider);
 
     return MaterialApp.router(
       title: 'Artemis Business OS',
       theme: AppTheme.lightTheme(),
       debugShowCheckedModeBanner: false,
       routerConfig: router,
-      locale: locale.materialLocale,
-      supportedLocales: AppLocale.values.map((l) => l.materialLocale).toList(),
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        DefaultMaterialLocalizations.delegate,
-        DefaultWidgetsLocalizations.delegate,
-      ],
       builder: (context, child) {
         if (!authState.initialized) {
           return const _SplashScreen();

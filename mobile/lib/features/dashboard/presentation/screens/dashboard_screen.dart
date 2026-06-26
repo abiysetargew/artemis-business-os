@@ -1,4 +1,3 @@
-import 'package:artemis_business_os/core/i18n/locale_provider.dart';
 import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
