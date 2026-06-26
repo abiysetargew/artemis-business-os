@@ -124,6 +124,24 @@ export class InventoryUseCase {
 
     const quantity = Number(dto.quantity);
 
+    // Domain rules: Finished goods cannot be manually adjusted (IN or OUT).
+    // They are managed automatically by:
+    //   - IN: Production batch creation
+    //   - OUT: Sales order creation
+    // Manual adjustments are only allowed for raw materials / packaging materials.
+    const itemWithCategory = await this.prisma.inventoryItem.findUnique({
+      where: { id: item.id },
+      include: { product: { include: { category: true } } },
+    });
+    const categoryType = (itemWithCategory as any)?.product?.category?.type;
+    if (categoryType === 'FINISHED_GOOD') {
+      throw new BadRequestException(
+        'Finished goods cannot be manually adjusted. ' +
+          'Stock changes happen automatically via production batches (IN) and sales (OUT). ' +
+          'If you need to write-off damaged stock, deactivate the product instead.',
+      );
+    }
+
     if (dto.type === AdjustmentType.IN) {
       const unitCost =
         dto.unitCost !== undefined

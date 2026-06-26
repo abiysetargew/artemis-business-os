@@ -1,6 +1,7 @@
 import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/theme/theme_provider.dart';
 import 'package:artemis_business_os/core/widgets/ui_pro.dart';
 import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
 import 'package:artemis_business_os/features/auth/domain/entities/user.dart';
@@ -111,7 +112,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 id: 'sale-${s['id']}',
                 title: s['orderNumber'] as String,
                 subtitle:
-                    '${s['customerName']} Ã‚Â· ETB ${(s['totalAmount'] as num).toStringAsFixed(0)}',
+                    '${s['customerName']} Ãƒâ€šÃ‚Â· ETB ${(s['totalAmount'] as num).toStringAsFixed(0)}',
                 icon: Icons.receipt_long_rounded,
                 category: 'SALE',
                 color: AppTheme.primaryColor,
@@ -284,6 +285,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           onPressed: _loadDashboard,
           tooltip: 'Refresh',
         ),
+        Consumer(
+          builder: (ctx, ref, _) {
+            final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
+            return IconButton(
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: Icon(
+                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  key: ValueKey(isDark),
+                ),
+              ),
+              onPressed: () {
+                ref.read(themeModeProvider.notifier).toggle();
+              },
+              tooltip: isDark ? 'Switch to Light' : 'Switch to Dark',
+            );
+          },
+        ),
         IconButton(
           icon: const Icon(Icons.settings_rounded),
           onPressed: () => context.push('/settings'),
@@ -360,10 +379,162 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   onTap: () => context.push('/products'),
                 ),
+              _QuickAction(
+                label: 'Suppliers',
+                icon: Icons.local_shipping_rounded,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                ),
+                onTap: () => context.push('/suppliers'),
+              ),
+              _QuickAction(
+                label: 'POs',
+                icon: Icons.shopping_bag_rounded,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                ),
+                onTap: () => context.push('/purchase-orders'),
+              ),
+              _QuickAction(
+                label: 'More',
+                icon: Icons.apps_rounded,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1F2937), Color(0xFF4B5563)],
+                ),
+                onTap: _showMoreSheet,
+              ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  void _showMoreSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.slate200,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'All Modules',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.slate900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Everything in Artemis',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.slate500,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _ModuleTile(
+                  label: 'Suppliers',
+                  icon: Icons.local_shipping_rounded,
+                  color: const Color(0xFF0F766E),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/suppliers');
+                  },
+                ),
+                _ModuleTile(
+                  label: 'Purchase Orders',
+                  icon: Icons.shopping_bag_rounded,
+                  color: const Color(0xFF0F766E),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/purchase-orders');
+                  },
+                ),
+                _ModuleTile(
+                  label: 'BOMs',
+                  icon: Icons.precision_manufacturing_rounded,
+                  color: const Color(0xFF14B8A6),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/production/boms');
+                  },
+                ),
+                _ModuleTile(
+                  label: 'Products',
+                  icon: Icons.inventory_2_rounded,
+                  color: const Color(0xFF14B8A6),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/products');
+                  },
+                ),
+                _ModuleTile(
+                  label: 'Production',
+                  icon: Icons.factory_rounded,
+                  color: AppTheme.warningColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/production/batches');
+                  },
+                ),
+                _ModuleTile(
+                  label: 'Reports',
+                  icon: Icons.insights_rounded,
+                  color: AppTheme.accentColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/reports');
+                  },
+                ),
+                _ModuleTile(
+                  label: 'Users',
+                  icon: Icons.manage_accounts_rounded,
+                  color: AppTheme.infoColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/users');
+                  },
+                ),
+                _ModuleTile(
+                  label: 'Settings',
+                  icon: Icons.settings_rounded,
+                  color: AppTheme.slate700,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/settings');
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -890,6 +1061,62 @@ class _QuickActionState extends State<_QuickAction>
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModuleTile extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ModuleTile({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      child: Container(
+        width: 100,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+              ),
+              child: Icon(icon, color: Colors.white, size: 20),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppTheme.slate900,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
         ),
       ),
     );

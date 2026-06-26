@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
@@ -29,6 +30,7 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
   String? _selectedRegion;
   String? _selectedCity;
   bool _isLoadingRegions = true;
+  bool _regionsLoadFailed = false;
   bool _isSaving = false;
 
   @override
@@ -48,12 +50,16 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
   }
 
   Future<void> _loadRegions() async {
+    setState(() {
+      _isLoadingRegions = true;
+      _regionsLoadFailed = false;
+    });
     try {
       final api = ref.read(apiClientProvider);
       final results = await Future.wait([
         api.get('/locations/regions'),
         api.get('/locations/regions-cities'),
-      ]);
+      ]).timeout(const Duration(seconds: 10));
       if (!mounted) return;
       setState(() {
         _regions = (results[0].data as List).cast<String>();
@@ -63,28 +69,64 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
         });
         _isLoadingRegions = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingRegions = false);
+    } catch (e) {
+      if (!mounted) return;
+      // Don't block the form — use empty regions, user can type manually
+      // via the free-text "Other" option we'll add below.
+      setState(() {
+        _isLoadingRegions = false;
+        _regionsLoadFailed = true;
+      });
     }
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedRegion == null) {
-      showAppSnackBar(
-        context,
-        message: 'Please select a region',
-        isError: true,
-      );
-      return;
+
+    // If regions loaded successfully, require selection.
+    // If load failed, accept free text via "Other" fields.
+    if (!_regionsLoadFailed) {
+      if (_selectedRegion == null) {
+        showAppSnackBar(
+          context,
+          message: 'Please select a region',
+          isError: true,
+        );
+        return;
+      }
+      if (_selectedCity == null) {
+        showAppSnackBar(
+          context,
+          message: 'Please select a city',
+          isError: true,
+        );
+        return;
+      }
+    } else {
+      // Use free text fields
+      if (_otherRegionController.text.trim().isEmpty) {
+        showAppSnackBar(
+          context,
+          message: 'Please enter a region',
+          isError: true,
+        );
+        return;
+      }
+      if (_otherCityController.text.trim().isEmpty) {
+        showAppSnackBar(context, message: 'Please enter a city', isError: true);
+        return;
+      }
     }
-    if (_selectedCity == null) {
-      showAppSnackBar(context, message: 'Please select a city', isError: true);
-      return;
-    }
+
     setState(() => _isSaving = true);
     try {
       final api = ref.read(apiClientProvider);
+      final region = _regionsLoadFailed
+          ? _otherRegionController.text.trim()
+          : _selectedRegion!;
+      final city = _regionsLoadFailed
+          ? _otherCityController.text.trim()
+          : _selectedCity!;
       final response = await api.post(
         '/customers',
         data: {
@@ -92,8 +134,8 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
           'contactPerson': _contactController.text.trim(),
           'phoneNumber': _phoneController.text.trim(),
           'address': _addressController.text.trim(),
-          'region': _selectedRegion,
-          'city': _selectedCity,
+          'region': region,
+          'city': city,
           'creditLimit': double.tryParse(_creditLimitController.text) ?? 0,
         },
       );
@@ -113,6 +155,9 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
       if (mounted) setState(() => _isSaving = false);
     }
   }
+
+  final _otherRegionController = TextEditingController();
+  final _otherCityController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -195,59 +240,7 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
                           title: 'Location',
                           icon: Icons.map_rounded,
                           accentColor: AppTheme.infoColor,
-                          children: [
-                            DropdownButtonFormField<String>(
-                              initialValue: _selectedRegion,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Region *',
-                                prefixIcon: Icon(Icons.map_rounded),
-                              ),
-                              items: _regions
-                                  .map<DropdownMenuItem<String>>(
-                                    (r) => DropdownMenuItem(
-                                      value: r,
-                                      child: Text(r),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) => setState(() {
-                                _selectedRegion = v;
-                                _selectedCity = null;
-                              }),
-                              validator: (v) =>
-                                  v == null ? 'Region is required' : null,
-                            ),
-                            const SizedBox(height: 12),
-                            DropdownButtonFormField<String>(
-                              initialValue: _selectedCity,
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                labelText: 'City *',
-                                prefixIcon: const Icon(
-                                  Icons.location_city_rounded,
-                                ),
-                                hintText: _selectedRegion == null
-                                    ? 'Select region first'
-                                    : 'Choose a city',
-                              ),
-                              items: _selectedRegion == null
-                                  ? const <DropdownMenuItem<String>>[]
-                                  : (_regionCities[_selectedRegion] ?? [])
-                                        .map<DropdownMenuItem<String>>(
-                                          (c) => DropdownMenuItem(
-                                            value: c,
-                                            child: Text(c),
-                                          ),
-                                        )
-                                        .toList(),
-                              onChanged: _selectedRegion == null
-                                  ? null
-                                  : (v) => setState(() => _selectedCity = v),
-                              validator: (v) =>
-                                  v == null ? 'City is required' : null,
-                            ),
-                          ],
+                          children: _buildLocationFields(),
                         ),
                         const SizedBox(height: 16),
                         _Section(
@@ -283,6 +276,47 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
                             ),
                           ],
                         ),
+                        if (_regionsLoadFailed) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.warningLight,
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusMd,
+                              ),
+                              border: Border.all(
+                                color: AppTheme.warningColor.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.cloud_off_rounded,
+                                  color: AppTheme.warningColor,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Text(
+                                    'Couldn\'t load regions. Please retry or type the region/city below manually.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.slate700,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _loadRegions,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -297,7 +331,7 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.info_outline_rounded,
                                 color: AppTheme.infoColor,
                                 size: 20,
@@ -378,6 +412,78 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
               ),
             ),
     );
+  }
+
+  List<Widget> _buildLocationFields() {
+    if (_regionsLoadFailed) {
+      // Fallback: free text fields when API fails
+      return [
+        TextFormField(
+          controller: _otherRegionController,
+          decoration: const InputDecoration(
+            labelText: 'Region *',
+            hintText: 'e.g., Addis Ababa',
+            prefixIcon: Icon(Icons.map_rounded),
+          ),
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? 'Region is required' : null,
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _otherCityController,
+          decoration: const InputDecoration(
+            labelText: 'City *',
+            hintText: 'e.g., Bole',
+            prefixIcon: Icon(Icons.location_city_rounded),
+          ),
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? 'City is required' : null,
+        ),
+      ];
+    }
+    return [
+      DropdownButtonFormField<String>(
+        initialValue: _selectedRegion,
+        isExpanded: true,
+        decoration: const InputDecoration(
+          labelText: 'Region *',
+          prefixIcon: Icon(Icons.map_rounded),
+        ),
+        items: _regions
+            .map<DropdownMenuItem<String>>(
+              (r) => DropdownMenuItem(value: r, child: Text(r)),
+            )
+            .toList(),
+        onChanged: (v) => setState(() {
+          _selectedRegion = v;
+          _selectedCity = null;
+        }),
+        validator: (v) => v == null ? 'Region is required' : null,
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(
+        initialValue: _selectedCity,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: 'City *',
+          prefixIcon: const Icon(Icons.location_city_rounded),
+          hintText: _selectedRegion == null
+              ? 'Select region first'
+              : 'Choose a city',
+        ),
+        items: _selectedRegion == null
+            ? const <DropdownMenuItem<String>>[]
+            : (_regionCities[_selectedRegion] ?? [])
+                  .map<DropdownMenuItem<String>>(
+                    (c) => DropdownMenuItem(value: c, child: Text(c)),
+                  )
+                  .toList(),
+        onChanged: _selectedRegion == null
+            ? null
+            : (v) => setState(() => _selectedCity = v),
+        validator: (v) => v == null ? 'City is required' : null,
+      ),
+    ];
   }
 }
 

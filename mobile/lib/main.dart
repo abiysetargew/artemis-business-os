@@ -292,6 +292,8 @@ class ArtemisApp extends ConsumerWidget {
       theme: AppTheme.lightTheme(),
       darkTheme: AppTheme.darkTheme(),
       themeMode: themeMode,
+      themeAnimationDuration: const Duration(milliseconds: 300),
+      themeAnimationCurve: Curves.easeInOutCubic,
       debugShowCheckedModeBanner: false,
       routerConfig: router,
       builder: (context, child) {

@@ -43,7 +43,7 @@ export class PrismaInventoryItemRepository implements InventoryItemRepository {
   async findById(id: string): Promise<InventoryItemEntity | null> {
     const i = await this.prisma.inventoryItem.findUnique({
       where: { id },
-      include: { product: true },
+      include: { product: { include: { category: true } } },
     });
     return i ? this.toEntity(i) : null;
   }
