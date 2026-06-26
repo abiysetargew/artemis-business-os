@@ -1,4 +1,5 @@
 import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/theme/theme_provider.dart';
 import 'package:artemis_business_os/core/widgets/app_logo.dart';
 import 'package:artemis_business_os/core/widgets/main_shell.dart';
 import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
@@ -242,10 +243,13 @@ class ArtemisApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authNotifierProvider);
     final router = ref.watch(_routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'Artemis Business OS',
       theme: AppTheme.lightTheme(),
+      darkTheme: AppTheme.darkTheme(),
+      themeMode: themeMode,
       debugShowCheckedModeBanner: false,
       routerConfig: router,
       builder: (context, child) {
@@ -265,7 +269,7 @@ class _SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: AppGradients.headerBar),
+        decoration: const BoxDecoration(gradient: AppTheme.gradientAurora),
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,

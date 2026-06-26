@@ -1,4 +1,5 @@
 import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/theme/theme_provider.dart';
 import 'package:artemis_business_os/core/widgets/app_logo.dart';
 import 'package:artemis_business_os/core/widgets/main_shell.dart';
 import 'package:artemis_business_os/features/auth/application/auth_notifier.dart';
@@ -20,6 +21,9 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           _ProfileHeader(user: auth.user),
           const SizedBox(height: 8),
+          _SectionLabel(label: 'Appearance'),
+          _SettingsCard(children: [_ThemeTile()]),
+          const SizedBox(height: 12),
           _SectionLabel(label: 'Reports'),
           _SettingsCard(
             children: [
@@ -114,7 +118,7 @@ class _ProfileHeader extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: AppGradients.headerBar,
+        gradient: AppTheme.gradientAurora,
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         boxShadow: AppShadows.md,
       ),
@@ -326,6 +330,224 @@ class _Tile extends StatelessWidget {
                 size: 22,
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+class _ThemeTile extends ConsumerWidget {
+  const _ThemeTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeModeProvider);
+    final notifier = ref.read(themeModeProvider.notifier);
+    return InkWell(
+      onTap: () async {
+        final next = await showModalBottomSheet<ThemeMode>(
+          context: context,
+          backgroundColor: Colors.transparent,
+          builder: (ctx) => Container(
+            decoration: BoxDecoration(
+              color: Theme.of(ctx).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.slate300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Choose Theme',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(ctx).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _ThemeOption(
+                  title: 'Light',
+                  subtitle: 'Bright and clean',
+                  icon: Icons.light_mode_rounded,
+                  color: AppTheme.warningColor,
+                  selected: mode == ThemeMode.light,
+                  onTap: () => Navigator.pop(ctx, ThemeMode.light),
+                ),
+                const SizedBox(height: 8),
+                _ThemeOption(
+                  title: 'Dark',
+                  subtitle: 'Easy on the eyes',
+                  icon: Icons.dark_mode_rounded,
+                  color: AppTheme.accentColor,
+                  selected: mode == ThemeMode.dark,
+                  onTap: () => Navigator.pop(ctx, ThemeMode.dark),
+                ),
+                const SizedBox(height: 8),
+                _ThemeOption(
+                  title: 'System',
+                  subtitle: 'Match device setting',
+                  icon: Icons.settings_brightness_rounded,
+                  color: AppTheme.infoColor,
+                  selected: mode == ThemeMode.system,
+                  onTap: () => Navigator.pop(ctx, ThemeMode.system),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (next != null) {
+          await notifier.setMode(next);
+        }
+      },
+      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              ),
+              child: Icon(
+                mode == ThemeMode.dark
+                    ? Icons.dark_mode_rounded
+                    : Icons.light_mode_rounded,
+                color: AppTheme.accentColor,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Theme',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    switch (mode) {
+                      ThemeMode.light => 'Light',
+                      ThemeMode.dark => 'Dark',
+                      ThemeMode.system => 'System',
+                    },
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ThemeOption({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: 0.12)
+              : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(
+            color: selected ? color : Theme.of(context).dividerColor,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: selected
+                    ? color
+                    : color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              ),
+              child: Icon(icon, color: selected ? Colors.white : color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              Icon(Icons.check_circle_rounded, color: color, size: 22),
           ],
         ),
       ),

@@ -111,7 +111,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 id: 'sale-${s['id']}',
                 title: s['orderNumber'] as String,
                 subtitle:
-                    '${s['customerName']} Â· ETB ${(s['totalAmount'] as num).toStringAsFixed(0)}',
+                    '${s['customerName']} Ã‚Â· ETB ${(s['totalAmount'] as num).toStringAsFixed(0)}',
                 icon: Icons.receipt_long_rounded,
                 category: 'SALE',
                 color: AppTheme.primaryColor,
@@ -198,7 +198,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       flexibleSpace: FlexibleSpaceBar(
         stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
         background: HeroHeader(
-          gradient: AppTheme.gradientHeader,
+          gradient: AppTheme.gradientAurora,
           height: 200,
           glow: true,
           padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
@@ -328,6 +328,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 icon: Icons.factory_rounded,
                 gradient: AppTheme.gradientWarning,
                 onTap: () => context.push('/production/create'),
+              ),
+              _QuickAction(
+                label: 'BOMs',
+                icon: Icons.precision_manufacturing_rounded,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                ),
+                onTap: () => context.push('/production/boms'),
               ),
               _QuickAction(
                 label: 'Customers',
@@ -734,7 +742,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           expandedHeight: 200,
           pinned: true,
           flexibleSpace: Container(
-            decoration: const BoxDecoration(gradient: AppTheme.gradientHeader),
+            decoration: const BoxDecoration(gradient: AppTheme.gradientAurora),
           ),
         ),
         SliverPadding(

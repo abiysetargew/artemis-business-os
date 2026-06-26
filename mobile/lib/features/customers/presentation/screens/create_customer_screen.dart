@@ -1,7 +1,10 @@
 import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
+import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
+import 'package:artemis_business_os/core/widgets/ui_pro.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -19,10 +22,20 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
   final _contactController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
-  final _regionController = TextEditingController();
-  final _cityController = TextEditingController();
   final _creditLimitController = TextEditingController(text: '0');
+
+  List<String> _regions = [];
+  final Map<String, List<String>> _regionCities = {};
+  String? _selectedRegion;
+  String? _selectedCity;
+  bool _isLoadingRegions = true;
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRegions();
+  }
 
   @override
   void dispose() {
@@ -30,14 +43,45 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
     _contactController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
-    _regionController.dispose();
-    _cityController.dispose();
     _creditLimitController.dispose();
     super.dispose();
   }
 
+  Future<void> _loadRegions() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final results = await Future.wait([
+        api.get('/locations/regions'),
+        api.get('/locations/regions-cities'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _regions = (results[0].data as List).cast<String>();
+        _regionCities.clear();
+        (results[1].data as Map).forEach((k, v) {
+          _regionCities[k as String] = (v as List).cast<String>();
+        });
+        _isLoadingRegions = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingRegions = false);
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedRegion == null) {
+      showAppSnackBar(
+        context,
+        message: 'Please select a region',
+        isError: true,
+      );
+      return;
+    }
+    if (_selectedCity == null) {
+      showAppSnackBar(context, message: 'Please select a city', isError: true);
+      return;
+    }
     setState(() => _isSaving = true);
     try {
       final api = ref.read(apiClientProvider);
@@ -48,28 +92,22 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
           'contactPerson': _contactController.text.trim(),
           'phoneNumber': _phoneController.text.trim(),
           'address': _addressController.text.trim(),
-          'region': _regionController.text.trim(),
-          'city': _cityController.text.trim(),
+          'region': _selectedRegion,
+          'city': _selectedCity,
           'creditLimit': double.tryParse(_creditLimitController.text) ?? 0,
         },
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Customer "${response.data['name']}" created!'),
-            backgroundColor: Colors.green,
-          ),
+        showAppSnackBar(
+          context,
+          message: 'Customer "${response.data['name']}" created!',
+          isSuccess: true,
         );
-        context.pop(true); // Return true to trigger refresh
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(parseApiError(e)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showAppSnackBar(context, message: parseApiError(e), isError: true);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -79,172 +117,297 @@ class _CreateCustomerScreenState extends ConsumerState<CreateCustomerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.slate50,
       appBar: AppBar(
-        title: const Text('Add Customer'),
+        title: const Text('New Customer'),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => context.pop(),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Name
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Customer Name *',
-                prefixIcon: Icon(Icons.business),
-                hintText: 'e.g., Addis Ababa Distributors',
-              ),
-              validator: (v) =>
-                  v == null || v.isEmpty ? 'Name is required' : null,
-            ),
-            const SizedBox(height: 16),
-
-            // Contact Person
-            TextFormField(
-              controller: _contactController,
-              decoration: const InputDecoration(
-                labelText: 'Contact Person',
-                prefixIcon: Icon(Icons.person),
-                hintText: 'e.g., Abebe Kebede',
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Phone
-            TextFormField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone Number *',
-                prefixIcon: Icon(Icons.phone),
-                hintText: 'e.g., +251911234567',
-              ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Phone is required';
-                if (v.length < 7) return 'Enter a valid phone number';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Address
-            TextFormField(
-              controller: _addressController,
-              decoration: const InputDecoration(
-                labelText: 'Address',
-                prefixIcon: Icon(Icons.location_on),
-                hintText: 'e.g., Bole Road, Addis Ababa',
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Region & City
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _regionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Region *',
-                      prefixIcon: Icon(Icons.map),
+      body: _isLoadingRegions
+          ? const Center(child: CircularProgressIndicator())
+          : Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      children: [
+                        _Section(
+                          title: 'Basic Info',
+                          icon: Icons.business_rounded,
+                          accentColor: AppTheme.primaryColor,
+                          children: [
+                            TextFormField(
+                              controller: _nameController,
+                              decoration: const InputDecoration(
+                                labelText: 'Customer Name *',
+                                hintText: 'e.g., Addis Ababa Distributors',
+                                prefixIcon: Icon(Icons.business_rounded),
+                              ),
+                              validator: (v) => v == null || v.isEmpty
+                                  ? 'Name is required'
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _contactController,
+                              decoration: const InputDecoration(
+                                labelText: 'Contact Person',
+                                hintText: 'e.g., Abebe Kebede',
+                                prefixIcon: Icon(Icons.person_rounded),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              decoration: const InputDecoration(
+                                labelText: 'Phone Number *',
+                                hintText: '+251911234567',
+                                prefixIcon: Icon(Icons.phone_rounded),
+                              ),
+                              validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  return 'Phone is required';
+                                }
+                                if (v.length < 7) {
+                                  return 'Enter a valid phone number';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _addressController,
+                              decoration: const InputDecoration(
+                                labelText: 'Address',
+                                hintText: 'Bole Road',
+                                prefixIcon: Icon(Icons.location_on_outlined),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _Section(
+                          title: 'Location',
+                          icon: Icons.map_rounded,
+                          accentColor: AppTheme.infoColor,
+                          children: [
+                            DropdownButtonFormField<String>(
+                              initialValue: _selectedRegion,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Region *',
+                                prefixIcon: Icon(Icons.map_rounded),
+                              ),
+                              items: _regions
+                                  .map<DropdownMenuItem<String>>(
+                                    (r) => DropdownMenuItem(
+                                      value: r,
+                                      child: Text(r),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setState(() {
+                                _selectedRegion = v;
+                                _selectedCity = null;
+                              }),
+                              validator: (v) =>
+                                  v == null ? 'Region is required' : null,
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              initialValue: _selectedCity,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'City *',
+                                prefixIcon: const Icon(
+                                  Icons.location_city_rounded,
+                                ),
+                                hintText: _selectedRegion == null
+                                    ? 'Select region first'
+                                    : 'Choose a city',
+                              ),
+                              items: _selectedRegion == null
+                                  ? const <DropdownMenuItem<String>>[]
+                                  : (_regionCities[_selectedRegion] ?? [])
+                                        .map<DropdownMenuItem<String>>(
+                                          (c) => DropdownMenuItem(
+                                            value: c,
+                                            child: Text(c),
+                                          ),
+                                        )
+                                        .toList(),
+                              onChanged: _selectedRegion == null
+                                  ? null
+                                  : (v) => setState(() => _selectedCity = v),
+                              validator: (v) =>
+                                  v == null ? 'City is required' : null,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _Section(
+                          title: 'Credit',
+                          icon: Icons.account_balance_rounded,
+                          accentColor: AppTheme.successColor,
+                          children: [
+                            TextFormField(
+                              controller: _creditLimitController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d*\.?\d{0,2}'),
+                                ),
+                              ],
+                              decoration: const InputDecoration(
+                                labelText: 'Credit Limit',
+                                hintText: '0',
+                                prefixIcon: Icon(Icons.account_balance_rounded),
+                                prefixText: 'ETB ',
+                              ),
+                              validator: (v) {
+                                if (v == null || v.isEmpty) return null;
+                                final n = double.tryParse(v);
+                                if (n == null || n < 0) {
+                                  return 'Enter a valid amount';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppTheme.infoLight,
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusMd,
+                            ),
+                            border: Border.all(
+                              color: AppTheme.infoColor.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline_rounded,
+                                color: AppTheme.infoColor,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Text(
+                                  'Customer will be created with ACTIVE status. You can edit details later.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.slate700,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Required' : null,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextFormField(
-                    controller: _cityController,
-                    decoration: const InputDecoration(
-                      labelText: 'City *',
-                      prefixIcon: Icon(Icons.location_city),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.surfaceColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x14000000),
+                          blurRadius: 12,
+                          offset: Offset(0, -2),
+                        ),
+                      ],
                     ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Required' : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Credit Limit
-            TextFormField(
-              controller: _creditLimitController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(
-                labelText: 'Credit Limit (ETB)',
-                prefixIcon: Icon(Icons.account_balance),
-                hintText: '0',
-              ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return null;
-                final amount = double.tryParse(v);
-                if (amount == null || amount < 0) return 'Enter a valid amount';
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Info Card
-            Card(
-              color: Colors.blue.shade50,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.info_outline,
-                      color: Colors.blue,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Customer will be created with ACTIVE status. You can edit details later.',
-                        style: TextStyle(fontSize: 12),
+                    child: SafeArea(
+                      top: false,
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSaving ? null : _save,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusMd,
+                              ),
+                            ),
+                          ),
+                          icon: _isSaving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 20,
+                                ),
+                          label: const Text(
+                            'Create Customer',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
+    );
+  }
+}
 
-            // Save Button
-            ElevatedButton.icon(
-              onPressed: _isSaving ? null : _save,
-              icon: _isSaving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.check),
-              label: const Text('CREATE CUSTOMER'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
+class _Section extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color accentColor;
+  final List<Widget> children;
+
+  const _Section({
+    required this.title,
+    required this.icon,
+    required this.accentColor,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeaderPro(title: title, icon: icon, accentColor: accentColor),
+        GlassCard(
+          accentColor: accentColor,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          ),
         ),
-      ),
+      ],
     );
   }
 }

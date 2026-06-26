@@ -1,4 +1,4 @@
-import 'package:artemis_business_os/core/network/api_errors.dart';
+﻿import 'package:artemis_business_os/core/network/api_errors.dart';
 import 'package:artemis_business_os/core/providers.dart';
 import 'package:artemis_business_os/core/theme/app_theme.dart';
 import 'package:artemis_business_os/core/widgets/confirm_dialog.dart';
@@ -92,7 +92,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
           expandedHeight: 220,
           pinned: true,
           flexibleSpace: Container(
-            decoration: const BoxDecoration(gradient: AppTheme.gradientHeader),
+            decoration: const BoxDecoration(gradient: AppTheme.gradientAurora),
           ),
         ),
         SliverPadding(
@@ -166,13 +166,13 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
               colors: [Color(0xFF0284C7), Color(0xFF22D3EE)],
             ),
             AppTheme.infoColor,
-            'CASH · PENDING',
+            'CASH Â· PENDING',
             Icons.payments_rounded,
           )
         : (
             AppTheme.gradientWarning,
             AppTheme.warningColor,
-            'CREDIT · PENDING',
+            'CREDIT Â· PENDING',
             Icons.credit_card_rounded,
           );
 
@@ -181,7 +181,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     final dateStr = sale['orderDate'] as String?;
     final dateLabel = dateStr != null
         ? DateFormat(
-            'EEEE, MMM dd, yyyy · HH:mm',
+            'EEEE, MMM dd, yyyy Â· HH:mm',
           ).format(DateTime.parse(dateStr).toLocal())
         : '';
     final region = sale['region'] as String?;
@@ -447,7 +447,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${qty.toStringAsFixed(0)} × ETB ${price.toStringAsFixed(0)}',
+                                  '${qty.toStringAsFixed(0)} Ã— ETB ${price.toStringAsFixed(0)}',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: AppTheme.slate500,
@@ -527,3 +527,4 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     );
   }
 }
+

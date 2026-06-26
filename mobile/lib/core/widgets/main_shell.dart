@@ -1,4 +1,4 @@
-import 'package:artemis_business_os/core/theme/app_theme.dart';
+﻿import 'package:artemis_business_os/core/theme/app_theme.dart';
 import 'package:artemis_business_os/core/widgets/app_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -141,7 +141,7 @@ class BrandedAppBar extends StatelessWidget implements PreferredSizeWidget {
       preferredSize: preferredSize,
       child: Container(
         decoration: const BoxDecoration(
-          gradient: AppGradients.headerBar,
+          gradient: AppTheme.gradientAurora,
           boxShadow: AppShadows.sm,
         ),
         child: SafeArea(
@@ -196,3 +196,4 @@ class BrandedAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 }
+
